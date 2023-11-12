@@ -284,6 +284,10 @@ ifndef SKIP_TFLM
 	$(COPY) $(TFLM_TP_DIR)/flatbuffers/include/* $(BUILD_DIR)/src/third_party/flatbuffers/include
 	mkdir -p $(BUILD_DIR)/src/third_party/ruy/ruy/profiler
 	$(COPY) $(TFLM_TP_DIR)/ruy/ruy/profiler/instrumentation.h $(BUILD_DIR)/src/third_party/ruy/ruy/profiler
+	mkdir -p $(BUILD_DIR)/src/third_party/fft2d
+	$(COPY) $(TFLM_TP_DIR)/fft2d/fft.h $(BUILD_DIR)/src/third_party/fft2d
+	$(COPY) $(TFLM_TP_DIR)/fft2d/fft2d.h $(BUILD_DIR)/src/third_party/fft2d
+	$(COPY) $(TFLM_TP_DIR)/fft2d/fft4g.c $(BUILD_DIR)/src/third_party/fft2d
 endif
 
 
