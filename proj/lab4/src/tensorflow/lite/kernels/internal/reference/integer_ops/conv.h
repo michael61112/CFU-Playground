@@ -21,6 +21,29 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include <cstdio>
 
+
+int32_t matrix_fmaps[65536];
+int32_t matrix_filter[65536];
+int32_t matrix_result[65536];
+
+void matrix_multiply(int32_t* A, int rowsA, int colsA, int32_t* B, int rowsB, int colsB, int32_t* result) {
+    // Check if matrix dimensions are compatible for multiplication
+    if (colsA != rowsB) {
+        printf("Error: Incompatible matrix dimensions for multiplication\n");
+        return;
+    }
+
+    // Perform matrix multiplication
+    for (int i = 0; i < rowsA; ++i) {
+        for (int j = 0; j < colsB; ++j) {
+            result[i * colsB + j] = 0;
+            for (int k = 0; k < colsA; ++k) {
+                result[i * colsB + j] += A[i * colsA + k] * B[k * colsB + j];
+            }
+        }
+    }
+}
+
 namespace tflite {
 namespace reference_integer_ops {
 
@@ -96,8 +119,8 @@ inline void ConvPerChannel(
   printf("fmaps_num: %d\n",fmaps_num);
   printf("filter_size: %d\n",filter_size);
   printf("filter_num: %d\n",filter_num);
-  printf("result_size: %d\n",result_size);
-  printf("result_num: %d\n", result_num);
+  printf("result_channel: %d\n",result_channel);
+  printf("result_size: %d\n", result_size);
 
 
   for (int batch = 0; batch < batches; ++batch) {
@@ -107,20 +130,14 @@ inline void ConvPerChannel(
 //  fmaps prepare : 3D to 2D
 //
 //
-/*
-  int fmaps_size = filter_height * filter_width;
-  int out_h = (input_height - filter_height + 2 * pad_height) / stride_height + 1;
-  int out_w = (input_width - filter_width + 2 * pad_width) / stride_width + 1;
-  int fmaps_num = out_h * out_w * input_depth;
-*/
   int fmaps_ind;
   int fmaps_loc;
-
+/*
     int** matrix_fmaps = (int**)malloc(fmaps_num * sizeof(int*));
     for (int i = 0; i < fmaps_num; ++i) {
         matrix_fmaps[i] = (int*)malloc(fmaps_size * sizeof(int));
     }
-
+*/
 
     for (int out_y = 0; out_y < output_height; ++out_y) {
       const int in_y_origin = (out_y * stride_height) - pad_height;
@@ -131,7 +148,6 @@ inline void ConvPerChannel(
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           auto group = out_channel / filters_per_group;
 //--------------------------------------------------------------------------------          
-          int32_t acc = 0;
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
@@ -147,8 +163,9 @@ inline void ConvPerChannel(
               for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
 		fmaps_ind = in_channel + group * filter_input_depth; 
 		fmaps_loc = in_x + in_y * filter_width;
-      	        int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)];
-		matrix_fmaps[fmaps_ind][fmaps_loc] = input_val;
+      	        int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)] + input_offset;
+		
+		matrix_fmaps[fmaps_ind * fmaps_num + fmaps_loc] = input_val;
               }
             }
           }
@@ -160,17 +177,10 @@ inline void ConvPerChannel(
 //  filter prepare : 4D to 2D
 //
 //
-/*
-  int filter_size = filter_height * filter_width;
-  int filter_num = filter_input_depth * output_depth;
-*/
   int filter_ind;
   int filter_loc;
 
-    int** matix_filter = (int**)malloc(filter_size * sizeof(int*));
-    for (int i = 0; i < filter_size; ++i) {
-        matix_filter[i] = (int*)malloc(filter_num * sizeof(int));
-    }
+
 
 //-------------------------------------------------------------------------------       
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
@@ -184,7 +194,7 @@ inline void ConvPerChannel(
 		filter_ind = in_channel + (out_channel * filter_input_depth);
 		filter_loc = filter_x + filter_y * filter_width;
 
-		matix_filter[filter_loc][filter_ind] = filter_val;
+		matrix_filter[filter_loc * filter_size + filter_ind] = filter_val;
               }
             }
           }
@@ -192,12 +202,9 @@ inline void ConvPerChannel(
 
 
 //----------------------------------------------------------------------------------------------------
-    int** matrix_result = (int**)malloc(result_size * sizeof(int*));
-    for (int i = 0; i < result_size; ++i) {
-        matrix_result[i] = (int*)malloc(result_channel * sizeof(int));
-    }
+
   
-  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, &matixresult);
+  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, matrix_result);
 
 
 
@@ -216,7 +223,7 @@ inline void ConvPerChannel(
 	  for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
 	
 	    result_ind = in_channel + out_channel;
-	    acc += matrixresult[result_loc][result_ind];
+	    acc += matrix_result[result_loc * result_size + result_ind];
 	  }
 
 	  if (bias_data) {
@@ -232,13 +239,13 @@ inline void ConvPerChannel(
         }
       }
     }
-    free(matrix_fmaps);
-    free(matrix_filter);
-    free(matrix_result);
-}
 
 
-void matrix_multiply(int** A, int rowsA, int colsA, int** B, int rowsB, int colsB, int** result) {
+  } // batch
+
+}  // ConvPerChannel
+/*
+void matrix_multiply(int** A, int rowsA, int colsA, int** B, int rowsB, int colsB, int*** result) {
     // Check if matrix dimensions are compatible for multiplication
     if (colsA != rowsB) {
         printf("Error: Incompatible matrix dimensions for multiplication\n");
@@ -260,7 +267,9 @@ void matrix_multiply(int** A, int rowsA, int colsA, int** B, int rowsB, int cols
             }
         }
     }
-}
+  }
+*/
+
 
 inline void ConvPerChannelWithPackedInt4Weights(
     const ConvParams& params, const int32_t* output_multiplier,
