@@ -21,10 +21,14 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include <cstdio>
 
-
-int32_t matrix_fmaps[65536];
-int32_t matrix_filter[65536];
-int32_t matrix_result[65536];
+/*
+int32_t matrix_fmaps[65536][65536];
+int32_t matrix_filter[65536][65536];
+int32_t matrix_result[65536][65536];
+*/
+int32_t matrix_fmaps[1024][1024];
+int32_t matrix_filter[1024][1024];
+int32_t matrix_result[1024][1024];
 
 void matrix_multiply(int32_t* A, int rowsA, int colsA, int32_t* B, int rowsB, int colsB, int32_t* result) {
     // Check if matrix dimensions are compatible for multiplication
@@ -39,6 +43,24 @@ void matrix_multiply(int32_t* A, int rowsA, int colsA, int32_t* B, int rowsB, in
             result[i * colsB + j] = 0;
             for (int k = 0; k < colsA; ++k) {
                 result[i * colsB + j] += A[i * colsA + k] * B[k * colsB + j];
+            }
+        }
+    }
+}
+
+void matrix_multiply2D(int rowsA, int colsA, int rowsB, int colsB) {
+    // Check if matrix dimensions are compatible for multiplication
+    if (colsA != rowsB) {
+        printf("Error: Incompatible matrix dimensions for multiplication\n");
+        return;
+    }
+
+    // Perform matrix multiplication
+    for (int i = 0; i < rowsA; ++i) {
+        for (int j = 0; j < colsB; ++j) {
+            matrix_result[i][j] = 0;
+            for (int k = 0; k < colsA; ++k) {
+                matrix_result[i][j] += matrix_fmaps[i][k] * matrix_filter[k][j];
             }
         }
     }
@@ -102,57 +124,63 @@ inline void ConvPerChannel(
 
 
   // fmaps_num * fmaps_size
-  int fmaps_size = filter_height * filter_width;
-  int out_h = (input_height - filter_height + 2 * pad_height) / stride_height + 1;
-  int out_w = (input_width - filter_width + 2 * pad_width) / stride_width + 1;
-  int fmaps_num = out_h * out_w * input_depth;
+  int fmaps_num = output_height * output_width;
+  int fmaps_size = filter_height * filter_width * input_depth;
 
   // filter_size * filter_num
-  int filter_size = filter_height * filter_width;
-  int filter_num = filter_input_depth * output_depth;
+  int filter_size = filter_height * filter_width * filter_input_depth;
+  int filter_num = output_depth;
 
   // result_size * result_channel
-  int result_channel = filter_num;
   int result_size = fmaps_num;
+  int result_num = filter_num;
 
-  printf("fmaps_size: %d\n",fmaps_size);
+  printf("\n\n");
   printf("fmaps_num: %d\n",fmaps_num);
+  printf("fmaps_size: %d\n",fmaps_size);
   printf("filter_size: %d\n",filter_size);
   printf("filter_num: %d\n",filter_num);
-  printf("result_channel: %d\n",result_channel);
   printf("result_size: %d\n", result_size);
+  printf("result_num: %d\n",result_num);
+  int32_t acc;
+
+  int fmaps_row;
+  int fmaps_col;
+
+  int filter_row;
+  int filter_col;
+
+  int result_row;
+  int result_col;
+
+  for (int batch = 0; batch < batches; ++batch)
+    for (int out_y = 0; out_y < output_height; ++out_y)
+      for (int out_x = 0; out_x < output_width; ++out_x)
+        for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+          output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
+		  static_cast<int8_t> (0);
+	}
 
 
   for (int batch = 0; batch < batches; ++batch) {
+
+      
 //-------------------------------------------------------------------------------
-
-
+    
 //  fmaps prepare : 3D to 2D
-//
-//
-  int fmaps_ind;
-  int fmaps_loc;
-/*
-    int** matrix_fmaps = (int**)malloc(fmaps_num * sizeof(int*));
-    for (int i = 0; i < fmaps_num; ++i) {
-        matrix_fmaps[i] = (int*)malloc(fmaps_size * sizeof(int));
-    }
-*/
 
     for (int out_y = 0; out_y < output_height; ++out_y) {
       const int in_y_origin = (out_y * stride_height) - pad_height;
       for (int out_x = 0; out_x < output_width; ++out_x) {
-        const int in_x_origin = (out_x * stride_width) - pad_width;
-
-//-------------------------------------------------------------------------------       
+        const int in_x_origin = (out_x * stride_width) - pad_width;       
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           auto group = out_channel / filters_per_group;
-//--------------------------------------------------------------------------------          
+//----
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
               const int in_x = in_x_origin + dilation_width_factor * filter_x;
-
+//-----
               // Zero padding by omitting the areas outside the image.
               const bool is_point_inside_image = (in_x >= 0) && (in_x < input_width) && (in_y >= 0) && (in_y < input_height);
 
@@ -160,71 +188,61 @@ inline void ConvPerChannel(
                 continue;
               }
 
-              for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
-		fmaps_ind = in_channel + group * filter_input_depth; 
-		fmaps_loc = in_x + in_y * filter_width;
-      	        int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)] + input_offset;
-		
-		matrix_fmaps[fmaps_ind * fmaps_num + fmaps_loc] = input_val;
+	      for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
+
+	        int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)] + input_offset;
+
+	        fmaps_row = out_x + out_y * output_width; //fmaps_num // location index
+	        fmaps_col = filter_x + filter_y * filter_width  + in_channel * (filter_height * filter_width); //fmaps_size //content * channel
+
+
+	        //matrix_fmaps[fmaps_row * fmaps_size + fmaps_col] = input_val;
+		matrix_fmaps[fmaps_row][fmaps_col] = input_val;
               }
             }
           }
 	}
       }
     }
+
+
 //----------------------------------------------------------------------------------------------------
-//
 //  filter prepare : 4D to 2D
-//
-//
-  int filter_ind;
-  int filter_loc;
 
+for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+  for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
+    for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
+      for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
+        int32_t filter_val = filter_data[Offset(filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
+	filter_row = filter_x + filter_y * filter_width + in_channel * (filter_height * filter_width); // filter_size
+	filter_col = out_channel; // filter_num
 
-//-------------------------------------------------------------------------------       
-        for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
-	  for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-            for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-
-              for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
-
-                int32_t filter_val = filter_data[Offset(filter_shape, out_channel, filter_y, filter_x, in_channel)];
-
-		filter_ind = in_channel + (out_channel * filter_input_depth);
-		filter_loc = filter_x + filter_y * filter_width;
-
-		matrix_filter[filter_loc * filter_size + filter_ind] = filter_val;
-              }
-            }
-          }
-	}
-
+	//matrix_filter[filter_row * filter_num + filter_col] = filter_val;
+	matrix_filter[filter_row][filter_col] = filter_val;
+      }
+    }
+  }
+}
 
 //----------------------------------------------------------------------------------------------------
 
-  
-  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, matrix_result);
-
-
+//  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, matrix_result);
+  matrix_multiply2D( fmaps_num, fmaps_size,  filter_size, filter_num);
 
 //----------------------------------------------------------------------------------------------------
 
-    int32_t acc;
-    int result_ind;
-    int result_loc;
 
+  for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
     for (int out_y = 0; out_y < output_height; ++out_y) {
       for (int out_x = 0; out_x < output_width; ++out_x) {
-        for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+        
 	
-          result_loc = out_x + out_y * output_width;
-	  acc = 0;
-	  for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
-	
-	    result_ind = in_channel + out_channel;
-	    acc += matrix_result[result_loc * result_size + result_ind];
-	  }
+          result_row = out_x + out_y * output_width; // result_size
+	  result_col = out_channel; // result_num
+
+//	  acc = matrix_result[result_row * result_num + result_col];
+	  acc = matrix_result[result_row][result_col];
 
 	  if (bias_data) {
             acc += bias_data[out_channel];
@@ -239,37 +257,8 @@ inline void ConvPerChannel(
         }
       }
     }
-
-
   } // batch
-
 }  // ConvPerChannel
-/*
-void matrix_multiply(int** A, int rowsA, int colsA, int** B, int rowsB, int colsB, int*** result) {
-    // Check if matrix dimensions are compatible for multiplication
-    if (colsA != rowsB) {
-        printf("Error: Incompatible matrix dimensions for multiplication\n");
-        return;
-    }
-
-    // Allocate memory for the result matrix
-    *result = (int**)malloc(rowsA * sizeof(int*));
-    for (int i = 0; i < rowsA; ++i) {
-        (*result)[i] = (int*)malloc(colsB * sizeof(int));
-    }
-
-    // Perform matrix multiplication
-    for (int i = 0; i < rowsA; ++i) {
-        for (int j = 0; j < colsB; ++j) {
-            (*result)[i][j] = 0;
-            for (int k = 0; k < colsA; ++k) {
-                (*result)[i][j] += A[i][k] * B[k][j];
-            }
-        }
-    }
-  }
-*/
-
 
 inline void ConvPerChannelWithPackedInt4Weights(
     const ConvParams& params, const int32_t* output_multiplier,
