@@ -21,7 +21,6 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include <cstdio>
 
-#include "cfu.h"
 #include "perf.h"
 #include "models/my_cycles.h"
 
@@ -147,11 +146,6 @@ inline void ConvPerChannel(
   printf("filter_num: %d\n",filter_num);
   printf("result_size: %d\n", result_size);
   printf("result_num: %d\n",result_num);
-
-  int K, M, N;
-  K = fmaps_num;
-  M = fmaps_size;
-  N = filter_size;
   int32_t acc;
 
   int fmaps_row;
@@ -239,47 +233,7 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
 
 //  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, matrix_result);
   matrix_multiply2D( fmaps_num, fmaps_size,  filter_size, filter_num);
-  //cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
-  printf("Reset\n");
-  cfu_op0(/* funct7= */ 1, /* in0= */ 0, /* in1= */ 0); // reset
-  printf("Reset Done & Set K\n");
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K); // Set parameter K
-  printf("Set K Done & Read K\n");
-  int K_ret = cfu_op0(/* funct7= */ 3, /* in0= */ K, /* in1= */ K); // Read parameter K
-  printf("Read K Done & Set M\n");
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M); // Set parameter M
-  printf("Set M Done & Read M\n");
-  int M_ret = cfu_op0(/* funct7= */ 5, /* in0= */ M, /* in1= */ M); // Set parameter M
-  printf("Read M Done & Set N\n");
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N); // Set parameter N
-  printf("Set N Done & Read N\n");
-  int N_ret =  cfu_op0(/* funct7= */ 7, /* in0= */ N, /* in1= */ N); // Set parameter N
-  printf("Read N Done\n");
 
-  printf ("Set K: %d, Return K: %d\n", K, K_ret);
-  printf ("Set M: %d, Return M: %d\n", M, M_ret);
-  printf ("Set N: %d, Return N: %d\n", N, N_ret);
-
-
-
-// K*M
-
-    int calign = int((M+3)/4)*4;
-
-    for (int cptr=0; cptr < calign; cptr+=4) {
-        for (int dr=0; dr < K; dr++) {
-	  int32_t in_data4 = 0;
-	  int16_t addr = cptr + dr * 4;
-	  in_data4 |= (matrix_fmaps[dr][cptr+0] & 0xFF);
-	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+1] & 0xFF) << 8);
-	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+2] & 0xFF) << 16);
-	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+3] & 0xFF) << 24);
-	  int16_t check_index = cfu_op0(/* funct7= */ 8, /* in0= */ addr, /* in1= */ in_data4); // Set global bufer A
-	  int32_t ret = cfu_op0(/* funct7= */ 9, /* in0= */ addr, /* in1= */ in_data4); // Read global bufer A
-
-	  printf("Set Buffer A, in: %lX, \t\taddr: %hd, \t\tcheck_index: %hd \t\tout: %lX\n", in_data4, addr, check_index, ret);
-	}
-    }
 //----------------------------------------------------------------------------------------------------
 
 
