@@ -63,6 +63,31 @@ void do_exercise_cfu_op0(void) {
   printf("Performed %d comparisons", count);
 }
 
+
+void read_write_cfu(void) {
+  int K=100;
+  int M=200;
+  int N=300;
+  printf("Reset\n");
+  cfu_op0(/* funct7= */ 1, /* in0= */ 0, /* in1= */ 0); // reset
+  printf("Reset Done & Set K\n");
+  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K); // Set parameter K
+  printf("Set K Done & Read K\n");
+  int K_ret = cfu_op0(/* funct7= */ 3, /* in0= */ K, /* in1= */ K); // Read parameter K
+  printf("Read K Done & Set M\n");
+  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M); // Set parameter M
+  printf("Set M Done & Read M\n");
+  int M_ret = cfu_op0(/* funct7= */ 5, /* in0= */ M, /* in1= */ M); // Set parameter M
+  printf("Read M Done & Set N\n");
+  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N); // Set parameter N
+  printf("Set N Done & Read N\n");
+  int N_ret =  cfu_op0(/* funct7= */ 7, /* in0= */ N, /* in1= */ N); // Set parameter N
+  printf("Read N Done\n");
+
+  printf ("Set K: %d, Return K: %d\n", K, K_ret);
+  printf ("Set M: %d, Return M: %d\n", M, M_ret);
+  printf ("Set N: %d, Return N: %d\n", N, N_ret);
+}
 struct Menu MENU = {
     "Project Menu",
     "project",
@@ -70,6 +95,7 @@ struct Menu MENU = {
         MENU_ITEM('0', "exercise cfu op0", do_exercise_cfu_op0),
         MENU_ITEM('g', "grid cfu op0", do_grid_cfu_op0),
         MENU_ITEM('h', "say Hello", do_hello_world),
+        MENU_ITEM('r', "read_write_cfu", read_write_cfu),
         MENU_END,
     },
 };
