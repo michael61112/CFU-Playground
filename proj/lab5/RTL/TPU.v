@@ -63,9 +63,9 @@ module TPU
 input clk;
 input rst_n;
 input            in_valid;
-input [7:0]      K;
-input [7:0]      M;
-input [7:0]      N;
+input [31:0]      K;
+input [31:0]      M;
+input [31:0]      N;
 output           busy;
 output [3:0]     state_TPU_o;
 output [2:0]     state_SA_o;

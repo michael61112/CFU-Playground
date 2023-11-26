@@ -15,30 +15,29 @@ module TPU_fsm
 )
 (
 	// Global Signals 
-	input   wire                     	clk,
-	input   wire                     	rst_n,
-	output  wire [3:0] 			 	    state_TPU_o,
-    input            					in_valid,
-	input								done,
-    input [7:0]      					K,
-    input [7:0]     					M,
-    input [7:0]      					N,
+	input   wire                    clk,
+	input   wire                    rst_n,
+	output  wire [3:0] 		state_TPU_o,
+    	input            		in_valid,
+	input				done,
+    	input [31:0]      		K,
+    	input [31:0]     		M,
+    	input [31:0]      		N,
 
+    	output     			busy,
+    	output      			sa_rst_n,
 
-    output     							busy,
-    output      						sa_rst_n,
-
-	output      						A_wr_en,
-	output [15:0]    					A_index,
-	input  [31:0]    					A_data_out,
+	output      			A_wr_en,
+	output [15:0]    		A_index,
+	input  [31:0]    		A_data_out,
 	
-	output      						B_wr_en,
-	output [15:0]    					B_index,
-	input  [31:0]    					B_data_out,
+	output      			B_wr_en,
+	output [15:0]    		B_index,
+	input  [31:0]    		B_data_out,
     
-	output      						C_wr_en,
-    output  [ADDR_BITS-1:0]    			C_index,
-    output  [DATAC_BITS-1:0]    		C_data_in,
+	output      			C_wr_en,
+    	output  [ADDR_BITS-1:0]    	C_index,
+    	output  [DATAC_BITS-1:0]    	C_data_in,
 
 	output [DATA_BITS-1:0] local_buffer_A0,
 	output [DATA_BITS-1:0] local_buffer_A1,
@@ -54,10 +53,10 @@ module TPU_fsm
 	input [DATAC_BITS-1:0] local_buffer_C2,
 	input [DATAC_BITS-1:0] local_buffer_C3
 );
-begin
-	reg [15:0]				 			i, j;
-	integer								t;
-	reg [3:0] 							state;
+
+	reg [15:0]	i, j;
+	integer		t;
+	reg [3:0] 	state;
 	assign state_TPU_o = state;
 	
 	reg A_wr_en_temp;
@@ -73,9 +72,9 @@ begin
 	assign result_temp[1] = local_buffer_C1;
 	assign result_temp[2] = local_buffer_C2;
 
-	reg [7:0]    K_reg;
-	reg [7:0]    M_reg;
-	reg [7:0]    N_reg;
+	reg [31:0]    K_reg;
+	reg [31:0]    M_reg;
+	reg [31:0]    N_reg;
 
 	assign result_temp[3] = local_buffer_C3;
 
@@ -353,5 +352,5 @@ end
 
 
 	
-end
+
 endmodule

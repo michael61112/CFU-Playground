@@ -28,9 +28,10 @@ module global_buffer #(parameter ADDR_BITS=8, parameter DATA_BITS=8)(clk, rst_n,
 // Global buffer read write behavior                                          //
 //----------------------------------------------------------------------------//
   always @ (negedge clk or negedge rst_n) begin
+
     if(!rst_n)begin
       for(i=0; i<(DEPTH); i=i+1)
-        gbuff[i] <= 'd0;
+        gbuff[i] = 'd0;
     end
     else begin
       if(wr_en) begin
