@@ -243,30 +243,12 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
   printf("Reset\n");
   cfu_op0(/* funct7= */ 1, /* in0= */ 0, /* in1= */ 0); // reset
   printf("Reset Done & Set K\n");
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K); // Set parameter K
-  printf("Set K Done & Read K\n");
-  int K_ret = cfu_op0(/* funct7= */ 3, /* in0= */ K, /* in1= */ K); // Read parameter K
-  printf("Read K Done & Set M\n");
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M); // Set parameter M
-  printf("Set M Done & Read M\n");
-  int M_ret = cfu_op0(/* funct7= */ 5, /* in0= */ M, /* in1= */ M); // Set parameter M
-  printf("Read M Done & Set N\n");
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N); // Set parameter N
-  printf("Set N Done & Read N\n");
-  int N_ret =  cfu_op0(/* funct7= */ 7, /* in0= */ N, /* in1= */ N); // Set parameter N
-  printf("Read N Done\n");
-
-  printf ("Set K: %d, Return K: %d\n", K, K_ret);
-  printf ("Set M: %d, Return M: %d\n", M, M_ret);
-  printf ("Set N: %d, Return N: %d\n", N, N_ret);
-
-
 
 // K*M
 
-    int calign = int((M+3)/4)*4;
+    int calignA = int((M+3)/4)*4;
 
-    for (int cptr=0; cptr < calign; cptr+=4) {
+    for (int cptr=0; cptr < calignA; cptr+=4) {
         for (int dr=0; dr < K; dr++) {
 	  int32_t in_data4 = 0;
 	  int16_t addr = cptr + dr * 4;
@@ -280,6 +262,51 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
 	  printf("Set Buffer A, in: %lX, \t\taddr: %hd, \t\tcheck_index: %hd \t\tout: %lX\n", in_data4, addr, check_index, ret);
 	}
     }
+
+// M*N
+
+    int calignB = int((N+3)/4)*4;
+
+    for (int cptr=0; cptr < calignB; cptr+=4) {
+        for (int dr=0; dr < M; dr++) {
+	  int32_t in_data4 = 0;
+	  int16_t addr = cptr + dr * 4;
+	  in_data4 |= (matrix_fmaps[dr][cptr+0] & 0xFF);
+	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+1] & 0xFF) << 8);
+	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+2] & 0xFF) << 16);
+	  in_data4 |= ((int32_t)(matrix_fmaps[dr][cptr+3] & 0xFF) << 24);
+	  int16_t check_index = cfu_op0(/* funct7= */ 10, /* in0= */ addr, /* in1= */ in_data4); // Set global bufer A
+	  int32_t ret = cfu_op0(/* funct7= */ 11, /* in0= */ addr, /* in1= */ 0); // Read global bufer A
+
+	  printf("Set Buffer B, in: %lX, \t\taddr: %hd, \t\tcheck_index: %hd \t\tout: %lX\n", in_data4, addr, check_index, ret);
+	}
+    }
+/*
+// Set in_valid
+cfu_op0(11, addr, in_data4); 
+// Check Status
+
+    while(1) {
+	int busy = cfu_op0( 13, 0, 0); 
+	if (!busy)
+	  break;
+    }
+*//*
+    int calignC = int((N+3)/4)*4;
+
+    for (int cptr=0; cptr < calignC; cptr+=4) {
+        for (int dr=0; dr < K; dr++) {
+	  
+	  int32_t in_data4 = 0;
+	  int16_t addr = cptr + dr * 4;
+	  int32_t ret = cfu_op0(11, addr, 0); // Read global bufer C
+	  matrix_result[dr][cptr+0] = (int32_t)(ret & 0xFF);
+	  matrix_result[dr][cptr+1] = (int32_t)((matrix_fmaps & (0xFF << 8)) >> 8);
+	  matrix_result[dr][cptr+2] = (int32_t)((matrix_fmaps & 0xFF << 16)) >>16);
+	  matrix_result[dr][cptr+3] = (int32_t)((matrix_fmaps & 0xFF << 24)) >>24);
+	}
+    }
+*/
 //----------------------------------------------------------------------------------------------------
 
 
