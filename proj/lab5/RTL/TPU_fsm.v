@@ -220,8 +220,8 @@ end
 				C_wr_en_temp <= 1'b0;
 				busy_temp <= 1'b0;
 				sa_rst_n_temp <= 1'b0;
-				i=0;
-				j=0;
+				i<=0;
+				j<=0;
 				for (t = 0; t <4; t = t + 1)
 					result[t] <= 128'b0;
 				Koffset_times <= 0;
@@ -315,8 +315,8 @@ end
 				C_wr_en_temp <= 1'b0;
 				busy_temp <= 1'b1;
 				sa_rst_n_temp <= 1'b0;
-				i=0;
-				j=0;
+				i<=0;
+				j<=0;
 				for (t = 0; t <4; t = t + 1)
 					result[t] <= 128'b0;
 				Koffset_times <= 0;
@@ -332,8 +332,8 @@ end
 				C_wr_en_temp <= 1'b0;
 				busy_temp <= 1'b1;
 				sa_rst_n_temp <= 1'b0;
-				i=0;
-				j=0;
+				i<=0;
+				j<=0;
 				for (t = 0; t <4; t = t + 1)
 					result[t] <= 128'b0;
 				Koffset_times <= 0;
