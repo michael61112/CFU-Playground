@@ -255,7 +255,7 @@ assign B_data_in_mux =  B_data_in_init;
 	cmd_ready <= 1'b1;
 	case (op)
 	  7'd1: begin // Reset
-	    rst_n <= 1'b0;
+	    rst_n <= cmd_payload_inputs_0[0];
 	    K = 'bx;
 	    M = 'bx;
 	    N = 'bx;
@@ -331,13 +331,13 @@ assign B_data_in_mux =  B_data_in_init;
 	endcase
       end
       S2: begin // Wait one cycle output buffer A
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= A_data_out;
       end
       S3: begin
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b1;
       end
@@ -346,31 +346,31 @@ assign B_data_in_mux =  B_data_in_init;
 	rsp_valid <= 1'b0;
       end
       S5: begin // Wait one cycle output buffer B
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= B_data_out;
       end
       S6: begin // Wait one cycle output buffer C
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= C_data_out[31:0];
       end
       S7: begin // Wait one cycle output buffer C
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= C_data_out[63:32];
       end
       S8: begin // Wait one cycle output buffer C
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= C_data_out[95:64];
       end
       S9: begin // Wait one cycle output buffer C
-	rst_n <= 1'b1;
+	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
 	rsp_payload_outputs_0 <= C_data_out[127:96];
