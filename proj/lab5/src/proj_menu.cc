@@ -366,6 +366,166 @@ void calculate_5by5(void) {
   }
 }
 
+void calculate_7by5(void) {
+  int32_t matrix_fmaps[15][15];
+  int32_t matrix_filter[15][15];
+  int32_t matrix_result[15][15];
+  int K = 6;
+  int M = 7;
+  int N = 5;
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < K; j++) {
+      matrix_fmaps[i][j] = j + K * i;
+      printf("%ld\t", matrix_fmaps[i][j]);
+    }
+    printf("\n");
+  }
+  for (int i = 0; i < K; i++) {
+    for (int j = 0; j < N; j++) {
+      matrix_filter[i][j] = j + N * i;
+      printf("%ld\t", matrix_filter[i][j]);
+    }
+    printf("\n");
+  }
+
+  //--------------------------------------------------
+  printf("Reset\n");
+  cfu_op0(1, 0, 0);  // reset
+  cfu_op0(1, 1, 0);
+                     //--------------------------------------------------
+  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
+  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
+  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
+
+  int calignA = int((M + 3) / 4) * 4;
+  int16_t addr = 0;
+  for (int dr = 0; dr < calignA; dr += 4) {
+    for (int cptr = 0; cptr < K; cptr += 1) {
+      int32_t in_data4 = 0;
+      // int16_t addr = cptr + dr * 4;
+      // int16_t addr = cptr + dr * K;
+
+      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+      // if K M >4
+      if (dr < K - 1) {
+        a3 = matrix_fmaps[dr + 3][cptr];
+        a2 = matrix_fmaps[dr + 2][cptr];
+        a1 = matrix_fmaps[dr + 1][cptr];
+        a0 = matrix_fmaps[dr + 0][cptr];
+      } else {
+        switch (K % 4) {
+          case 1:
+            a3 = 0;
+            a2 = 0;
+            a1 = 0;
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+          case 2:
+            a3 = 0;
+            a2 = 0;
+            a1 = matrix_fmaps[dr + 1][cptr];
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+          case 3:
+            a3 = 0;
+            a2 = matrix_fmaps[dr + 2][cptr];
+            a1 = matrix_fmaps[dr + 1][cptr];
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+        }
+      }
+      in_data4 |= (a3 & 0xFF);
+      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
+      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
+      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
+
+      // cfu_op0(8, addr, matrix_fmaps[dr][cptr]); // Set global bufer A
+      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
+      cfu_op0(8, addr, in_data4);  // Set global bufer A
+      addr++;
+    }
+  }
+  printf("\n");
+  int calignB = int((N + 3) / 4) * 4;
+  addr = 0;
+  for (int cptr = 0; cptr < calignB; cptr += 4) {
+    for (int dr = 0; dr < K; dr++) {
+      int32_t in_data4 = 0;
+      // int16_t addr = dr + cptr * M;
+      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
+      // if M N >4
+      if (cptr < N - 1) {
+        b3 = matrix_filter[dr][cptr + 3];
+        b2 = matrix_filter[dr][cptr + 2];
+        b1 = matrix_filter[dr][cptr + 1];
+        b0 = matrix_filter[dr][cptr + 0];
+      } else {
+        switch (N % 4) {
+          case 1:
+            b3 = 0;
+            b2 = 0;
+            b1 = 0;
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+          case 2:
+            b3 = 0;
+            b2 = 0;
+            b1 = matrix_filter[dr][cptr + 1];
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+          case 3:
+            b3 = 0;
+            b2 = matrix_filter[dr][cptr + 2];
+            b1 = matrix_filter[dr][cptr + 1];
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+        }
+      }
+      in_data4 |= (b3 & 0xFF);
+      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
+      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
+      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
+      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
+      // cfu_op0(10, addr, matrix_fmaps[dr][cptr]); // Set global bufer B
+      cfu_op0(10, addr, in_data4);  // Set global bufer B
+      addr++;
+    }
+  }
+  //--------------------------------------------------
+  printf("In valid\n");
+  cfu_op0(12, 0, 0);
+  //--------------------------------------------------
+  // Check Status
+  while (1) {
+    int busy = cfu_op0(13, 0, 0);
+    if (!busy) break;
+  }
+
+  int calignC = int((N + 3) / 4) * 4;
+  addr = 0;
+  for (int cptr = 0; cptr < calignC; cptr += 4) {
+    for (int dr = 0; dr < M; dr++) {
+      //int16_t addr = dr + cptr * M;
+
+      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
+      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
+      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
+      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
+      addr++;
+    }
+  }
+
+  // int imargin = int((K+3)/4)*4;
+  // int jmargin = int((N+3)/4)*4;
+
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+      printf("%ld\t", matrix_result[i][j]);
+    }
+    printf("\n");
+  }
+}
+
 struct Menu MENU = {
     "Project Menu",
     "project",
@@ -376,6 +536,7 @@ struct Menu MENU = {
         MENU_ITEM('r', "read_write_cfu", read_write_cfu),
         MENU_ITEM('4', "check 4*4", calculate_4by4),
         MENU_ITEM('5', "check 5*5", calculate_5by5),
+        MENU_ITEM('7', "check 7*5", calculate_7by5),
         MENU_END,
     },
 };
