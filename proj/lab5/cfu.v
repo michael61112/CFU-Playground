@@ -6,7 +6,7 @@
 `include "/home/michael/hw/CFU-Playground/proj/lab5/RTL/TPU_fsm.v"
 
 module Cfu
-#(  parameter ADDR_BITS=12,
+#(  parameter ADDR_BITS=8,
 
     parameter DATA_BITS=32,
     parameter DATAC_BITS=128,
