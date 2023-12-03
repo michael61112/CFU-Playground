@@ -25,10 +25,10 @@ SOFTWARE.
 */
 
 module block(inp_north, inp_west, clk, rst, outp_south, outp_east, result);
-	input [7:0] inp_north, inp_west;
-	output reg [7:0] outp_south, outp_east;
+	input signed [7:0] inp_north, inp_west;
+	output reg signed [7:0] outp_south, outp_east;
 	input clk, rst;
-	output reg [31:0] result;
+	output reg signed [31:0] result;
 	wire [31:0] multi;
 	always @(posedge rst or posedge clk) begin
 		if(rst) begin
