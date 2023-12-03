@@ -710,7 +710,7 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
 
   int calignA = int((M + 3) / 4) * 4;
   int16_t addr = 0;
-  printf("\nMatrix A for global buffer =\n");
+  //printf("\nMatrix A for global buffer =\n");
   for (int dr = baseM; dr < baseM + calignA; dr += 4) {
     for (int cptr = baseK; cptr < baseK + K; cptr += 1) {
       int32_t in_data4 = 0;
@@ -754,7 +754,7 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
       in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
       in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
       in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
+      //printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
       cfu_op0(8, addr, in_data4);  // Set global bufer A
       addr++;
     }
@@ -762,7 +762,7 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
 
   int calignB = int((N + 3) / 4) * 4;
   addr = 0;
-  printf("\nMatrix B for global buffer =\n");
+  //printf("\nMatrix B for global buffer =\n");
   for (int cptr = baseN; cptr < baseN + calignB; cptr += 4) {
     for (int dr = baseK; dr < baseK + K; dr++) {
       int32_t in_data4 = 0;
@@ -805,7 +805,7 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
       in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
       in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
       in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
+      //printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
       cfu_op0(10, addr, in_data4);  // Set global bufer B
       addr++;
     }
@@ -834,12 +834,14 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
   }
 }
 
-void block_matrix(int M, int K, int N) {
-
+void prepare_matrixAB(int M, int K, int N, bool negtive) {
   printf("\nMatrix A =\n");
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < K; j++) {
-      matrix_fmaps[i][j] = j + K * i;
+      if (negtive & (i%2==0))
+        matrix_fmaps[i][j] = -(j + K * i);
+      else
+        matrix_fmaps[i][j] = j + K * i;
       printf("%ld\t", matrix_fmaps[i][j]);
     }
     printf("\n");
@@ -847,11 +849,18 @@ void block_matrix(int M, int K, int N) {
   printf("\nMatrix B =\n");
   for (int i = 0; i < K; i++) {
     for (int j = 0; j < N; j++) {
-      matrix_filter[i][j] = j + N * i;
+      if (negtive & (j%2==0))
+        matrix_filter[i][j] = -(j + N * i);
+      else
+        matrix_filter[i][j] = j + N * i;
       printf("%ld\t", matrix_filter[i][j]);
     }
     printf("\n");
   }
+}
+void block_matrix(int M, int K, int N, int negtive) {
+
+  prepare_matrixAB(M,K,N,negtive);
 //----------------------------------------------------------------
   int fmaps_size = K;
   int fmaps_num = M;
@@ -905,20 +914,23 @@ void block_matrix(int M, int K, int N) {
 }
 
 void block_matrix_7by5() {
-	block_matrix(7,6,5);
+	block_matrix(7,6,5,0);
 }
 
 void block_matrix_2by3() {
-	block_matrix(2,3,3);
+	block_matrix(2,3,3,0);
 }
 void block_matrix_4by4() {
-	block_matrix(4,4,4);
+	block_matrix(4,4,4,0);
 }
 void block_matrix_16by5() {
-	block_matrix(16,2,5);
+	block_matrix(16,2,5,0);
 }
 void block_matrix_17by5() {
-	block_matrix(17,2,5);
+	block_matrix(17,2,5,0);
+}
+void block_matrix_4by4n() {
+	block_matrix(4,4,4,1);
 }
 struct Menu MENU = {
     "Project Menu",
@@ -936,7 +948,8 @@ struct Menu MENU = {
 	      MENU_ITEM('s', "check block design of 2*3", block_matrix_2by3),
         MENU_ITEM('f', "check block design of 4*4", block_matrix_4by4),
         MENU_ITEM('l', "check block design of 16*5", block_matrix_16by5),
-        MENU_ITEM('p', "check block design of 16*5", block_matrix_17by5),
+        MENU_ITEM('p', "check block design of 17*5", block_matrix_17by5),
+        MENU_ITEM('n', "check block design of 4*4 with negtive", block_matrix_4by4n),
         MENU_END,
     },
 };
