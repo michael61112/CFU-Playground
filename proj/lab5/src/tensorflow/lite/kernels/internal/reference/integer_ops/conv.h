@@ -324,11 +324,23 @@ unsigned my_start = perf_get_mcycle();
 
 	      for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
 
-	        int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)] + input_offset;
-
+	        int32_t input_val = (int32_t)input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)] + input_offset;
+    
 	        fmaps_row = out_x + out_y * output_width; //fmaps_num // location index
 	        fmaps_col = filter_x + filter_y * filter_width  + in_channel * (filter_height * filter_width); //fmaps_size //content * channel
-
+          /*
+          if (input_val > -128) {
+            if (input_val < 127)
+              input_val = input_val;
+            else
+              input_val = 127;
+          }
+          else {
+            input_val = -128;
+          }
+          */
+          //if (input_val>127 || input_val < -128)
+            //printf("i:%d, j:%d, input_val=%ld, intput_val int8_t=%d, offset =%ld\n",fmaps_row,fmaps_col,input_val,input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)], input_offset);
 
 	        //matrix_fmaps[fmaps_row * fmaps_size + fmaps_col] = input_val;
 		matrix_fmaps[fmaps_row][fmaps_col] = input_val;
@@ -347,7 +359,7 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
   for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
     for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
       for (int in_channel = 0; in_channel < filter_input_depth; ++in_channel) {
-        int32_t filter_val = filter_data[Offset(filter_shape, out_channel, filter_y, filter_x, in_channel)];
+        int32_t filter_val = (int32_t)filter_data[Offset(filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
 	filter_row = filter_x + filter_y * filter_width + in_channel * (filter_height * filter_width); // filter_size
 	filter_col = out_channel; // filter_num
@@ -362,15 +374,19 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
 //----------------------------------------------------------------------------------------------------
 
 //  matrix_multiply(matrix_fmaps, fmaps_num, fmaps_size, matrix_filter, filter_size, filter_num, matrix_result);
-//  matrix_multiply2D( fmaps_num, fmaps_size,  filter_size, filter_num);
+  //matrix_multiply2D( fmaps_num, fmaps_size,  filter_size, filter_num);
 
-  int blockSize = 16;
+
   int K = fmaps_size;
   int M = fmaps_num;
   int N = filter_num;
+
+  int blockSize = 8;
   int KK = int((K + (blockSize-1))/blockSize)*blockSize;
   int MM = int((M + (blockSize-1))/blockSize)*blockSize;
   int NN = int((N + (blockSize-1))/blockSize)*blockSize;
+
+
 //-------------------------------------------
   for (int i = M; i < MM; i++) {
     for (int j = 0; j < KK; j++) {
@@ -432,6 +448,43 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
         }
       }
     }
+
+for(int i=0;i<4;i++){
+  for(int j=0;j<4;j++){
+    printf("%ld\t",matrix_result[i][j]);
+  }
+  printf("\n");
+}
+
+printf("check matric A\n");
+for(int i=0;i<M;i++){
+  for(int j=0;j<K;j++){
+    int32_t t = matrix_fmaps[i][j];
+    if (t>127 || t < -128)
+    printf("i:%d, j:%d, buffer A=%ld\n",i,j,t);
+  }
+  //printf("\n");
+}
+printf("check matric B\n");
+for(int i=0;i<K;i++){
+  for(int j=0;j<N;j++){
+    int32_t t = matrix_filter[i][j];
+    if (t>127 || t < -128)
+    printf("i:%d, j:%d, buffer B=%ld\n",i,j,t);
+  }
+  //printf("\n");
+}
+/*
+printf("check matric C");
+for(int i=0;i<M;i++){
+  for(int j=0;j<N;j++){
+    int32_t t = matrix_result[i][j];
+    if (t>2147483647 || t < -2147483648)
+    printf("i:%d, j:%d, buffer C=%ld\n",i,j,t);
+  }
+  printf("\n");
+}*/
+
 unsigned my_finish = perf_get_mcycle();
 my_cycles += (my_finish - my_start);
   } // batch
