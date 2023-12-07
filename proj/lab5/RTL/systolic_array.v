@@ -46,8 +46,6 @@ module systolic_array
 	input busy,
 	output done,
 
-//	debug
-
 	output [7:0] inp_north0_o,
 	output [7:0] inp_north1_o,
 	output [7:0] inp_north2_o,
@@ -56,10 +54,7 @@ module systolic_array
 	output [7:0] inp_west4_o, 
 	output [7:0] inp_west8_o, 
 	output [7:0] inp_west12_o,
-
 	output [31:0] result0_o,
-//
-
 
 	input [DATA_BITS-1:0] local_buffer_A0,
 	input [DATA_BITS-1:0] local_buffer_A1,
@@ -153,29 +148,10 @@ module systolic_array
 			endcase
 		end
 	end
-/*
-	always @(posedge clk or posedge rst) begin
-		if(rst) begin
-			done <= 0;
-			count <= 0;
-		end
-		else begin
-			if(count == count_in) begin
-				done <= 1;
-				count <= 0;
-			end
-			else begin
-				done <= 0;
-				count <= count + 1;
-			end
-		end	
-	end 
-	*/
 
 integer addr_n0, addr_n1, addr_n2, addr_n3;
 integer addr_w0, addr_w4, addr_w8, addr_w12;
 
-	// Set output value
 	always @(posedge clk) begin
 		case(state)
 			S0: begin 
@@ -215,7 +191,6 @@ integer addr_w0, addr_w4, addr_w8, addr_w12;
 
 				count <= count + 1;
 				done_temp <= 0;
-				
 			end
 			S2: begin 
 				count <= 0;
@@ -243,7 +218,6 @@ integer addr_w0, addr_w4, addr_w8, addr_w12;
 		endcase
 	end
 
-	//reg [15:0]				 i, j;
     reg [31:0]local_buffer_A[3:0];
     reg [31:0]local_buffer_B[3:0];
 	reg [127:0]local_buffer_C[3:0];
@@ -352,48 +326,5 @@ integer addr_w0, addr_w4, addr_w8, addr_w12;
     assign inp_west12 = inp_west12_temp;
 
 	assign done = done_temp;
-
-/*
-//----------------------------------------------------------------------------//
-// Local buffer AB read write behavior                                          //
-//----------------------------------------------------------------------------//
-  always @ (negedge clk or negedge rst_n) begin
-    if(!rst_n)begin
-      for(i=0; i<(DEPTH); i=i+1)
-        local_buffer_A[i] <= 128'b0;
-		local_buffer_B[i] <= 128'b0;
-    end
-    else begin
-      if(Lb_result_w) begin
-            local_buffer_A[lb_AB_index] <= local_buffer_Din_A;
-			local_buffer_B[lb_AB_index] <= local_buffer_Din_B;
-      end
-      else begin
-			lb_A_Do <= local_buffer_A[lb_AB_index];
-			lb_B_Do <= local_buffer_B[lb_AB_index];
-      end
-    end
-  end
-//----------------------------------------------------------------------------//
-// Local buffer C read write behavior                                          //
-//----------------------------------------------------------------------------//
-  always @ (negedge clk or negedge rst_n) begin
-    if(!rst_n)begin
-      for(j=0; i<(DEPTH); j=j+1)
-        local_buffer_C[j] <= 128'b0;
-    end
-    else begin
-      if(Lb_result_w) begin
-            local_buffer_C[0] <= {result0, result1, result2, result3};
-            local_buffer_C[1] <={result4, result5, result6, result7};
-            local_buffer_C[2] <={result8, result9, result10, result11};
-            local_buffer_C[3] <={result12, result13, result14, result15};
-      end
-      else begin
-        lb_C_Do <= local_buffer_C[lb_result_index];
-      end
-    end
-  end
-*/      
 endmodule
 		      
