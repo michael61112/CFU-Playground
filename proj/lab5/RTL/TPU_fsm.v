@@ -3,6 +3,8 @@ module TPU_fsm #(
     parameter DATA_BITS = 8,
     parameter DATA_BITS_LB_IN = (DATA_BITS * 2) * 4,
     parameter DATA_BITS_LB_OUT = DATA_BITS_LB_IN * 2,
+    parameter DATA_BITS_GB_IN = DATA_BITS * 4,
+    parameter DATA_BITS_GB_OUT = ((DATA_BITS * 2) * 4) * 2,
     parameter S0 = 4'b0000,
     parameter S1 = 4'b0001,
     parameter S2 = 4'b0010,
@@ -26,17 +28,17 @@ module TPU_fsm #(
     output busy,
     output sa_rst_n,
 
-    output                   A_wr_en,
-    output [  ADDR_BITS-1:0] A_index,
-    input  [DATA_BITS*4-1:0] A_data_out,
+    output                       A_wr_en,
+    output [      ADDR_BITS-1:0] A_index,
+    input  [DATA_BITS_GB_IN-1:0] A_data_out,
 
-    output                   B_wr_en,
-    output [  ADDR_BITS-1:0] B_index,
-    input  [DATA_BITS*4-1:0] B_data_out,
+    output                       B_wr_en,
+    output [      ADDR_BITS-1:0] B_index,
+    input  [DATA_BITS_GB_IN-1:0] B_data_out,
 
     output                        C_wr_en,
     output [       ADDR_BITS-1:0] C_index,
-    output [DATA_BITS_LB_OUT-1:0] C_data_in,
+    output [DATA_BITS_GB_OUT-1:0] C_data_in,
 
     output [DATA_BITS_LB_IN-1:0] local_buffer_A0,
     output [DATA_BITS_LB_IN-1:0] local_buffer_A1,
