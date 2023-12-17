@@ -26,25 +26,30 @@ SOFTWARE.
 
 module block #(
     parameter DATA_BITS = 16
-)  (
-    input signed [DATA_BITS-1:0] inp_north, inp_west,
-    input clk, rst,
-    output reg signed [DATA_BITS-1:0] outp_south, outp_east,
+) (
+    input signed [DATA_BITS-1:0] inp_north,
+    input signed [DATA_BITS-1:0] inp_west,
+    input clk,
+    input rst,
+    output reg signed [DATA_BITS-1:0] outp_south,
+    output reg signed [DATA_BITS-1:0] outp_east,
     output reg signed [DATA_BITS*2-1:0] result
-  );
+);
 
-	wire [DATA_BITS*2-1:0] multi;
-	always @(posedge rst or posedge clk) begin
-		if(rst) begin
-			result <= 0;
-			outp_east <= 0;
-			outp_south <= 0;
-		end
-		else begin
-			result <= result + multi;
-			outp_east <= inp_west;
-			outp_south <= inp_north;
-		end
-	end
-	assign multi = inp_north*inp_west;
+  wire [DATA_BITS*2-1:0] multi;
+
+  always @(posedge rst or posedge clk) begin
+    if (rst) begin
+      result <= 0;
+      outp_east <= 0;
+      outp_south <= 0;
+    end else begin
+      result <= result + multi;
+      outp_east <= inp_west;
+      outp_south <= inp_north;
+    end
+  end
+
+  assign multi = inp_north * inp_west;
+
 endmodule
