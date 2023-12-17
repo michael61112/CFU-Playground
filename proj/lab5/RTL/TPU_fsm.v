@@ -1,7 +1,8 @@
 module TPU_fsm #(
     parameter ADDR_BITS = 16,
-    parameter DATA_BITS = 32,
-    parameter DATAC_BITS = 128,
+    parameter DATA_BITS = 8,
+    parameter DATA_BITS_LB_IN = (DATA_BITS * 2) * 4,
+    parameter DATA_BITS_LB_OUT = DATA_BITS_LB_IN * 2,
     parameter S0 = 4'b0000,
     parameter S1 = 4'b0001,
     parameter S2 = 4'b0010,
@@ -26,30 +27,30 @@ module TPU_fsm #(
     output sa_rst_n,
 
     output        A_wr_en,
-    output [15:0] A_index,
-    input  [31:0] A_data_out,
+    output [ADDR_BITS-1:0] A_index,
+    input  [DATA_BITS*4-1:0] A_data_out,
 
     output        B_wr_en,
-    output [15:0] B_index,
-    input  [31:0] B_data_out,
+    output [ADDR_BITS-1:0] B_index,
+    input  [DATA_BITS*4-1:0] B_data_out,
 
     output                  C_wr_en,
     output [ ADDR_BITS-1:0] C_index,
-    output [DATAC_BITS-1:0] C_data_in,
+    output [DATA_BITS_LB_OUT-1:0] C_data_in,
 
-    output [DATA_BITS-1:0] local_buffer_A0,
-    output [DATA_BITS-1:0] local_buffer_A1,
-    output [DATA_BITS-1:0] local_buffer_A2,
-    output [DATA_BITS-1:0] local_buffer_A3,
-    output [DATA_BITS-1:0] local_buffer_B0,
-    output [DATA_BITS-1:0] local_buffer_B1,
-    output [DATA_BITS-1:0] local_buffer_B2,
-    output [DATA_BITS-1:0] local_buffer_B3,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A0,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A1,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A2,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A3,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B0,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B1,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B2,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B3,
 
-    input [DATAC_BITS-1:0] local_buffer_C0,
-    input [DATAC_BITS-1:0] local_buffer_C1,
-    input [DATAC_BITS-1:0] local_buffer_C2,
-    input [DATAC_BITS-1:0] local_buffer_C3
+    input [DATA_BITS_LB_OUT-1:0] local_buffer_C0,
+    input [DATA_BITS_LB_OUT-1:0] local_buffer_C1,
+    input [DATA_BITS_LB_OUT-1:0] local_buffer_C2,
+    input [DATA_BITS_LB_OUT-1:0] local_buffer_C3
 );
 
   reg [15:0] i, j;
@@ -63,8 +64,8 @@ module TPU_fsm #(
   reg busy_temp;
   reg sa_rst_n_temp;
 
-  reg [DATAC_BITS-1:0] result[3:0];
-  wire [DATAC_BITS-1:0] result_temp[3:0];
+  reg [DATA_BITS_LB_OUT-1:0] result[3:0];
+  wire [DATA_BITS_LB_OUT-1:0] result_temp[3:0];
 
   assign result_temp[0] = local_buffer_C0;
   assign result_temp[1] = local_buffer_C1;
@@ -112,15 +113,15 @@ module TPU_fsm #(
   reg [ ADDR_BITS-1:0] A_index_temp;
   reg [ ADDR_BITS-1:0] B_index_temp;
   reg [ ADDR_BITS-1:0] C_index_temp;
-  reg [DATAC_BITS-1:0] C_data_in_temp;
+  reg [DATA_BITS_LB_OUT-1:0] C_data_in_temp;
 
   assign A_index   = A_index_temp;
   assign B_index   = B_index_temp;
   assign C_index   = C_index_temp;
   assign C_data_in = C_data_in_temp;
 
-  reg [DATA_BITS-1:0] local_buffer_A[3:0];
-  reg [DATA_BITS-1:0] local_buffer_B[3:0];
+  reg [DATA_BITS_LB_IN-1:0] local_buffer_A[3:0];
+  reg [DATA_BITS_LB_IN-1:0] local_buffer_B[3:0];
 
   assign local_buffer_A0 = local_buffer_A[0];
   assign local_buffer_A1 = local_buffer_A[1];
@@ -213,7 +214,7 @@ module TPU_fsm #(
         sa_rst_n_temp <= 1'b0;
         i <= 0;
         j <= 0;
-        for (t = 0; t < 4; t = t + 1) result[t] <= 128'b0;
+        for (t = 0; t < 4; t = t + 1) result[t] <= {(DATA_BITS_LB_OUT){1'b0}};
         Koffset_times <= 0;
         Koffset <= 0;
 
@@ -245,8 +246,8 @@ module TPU_fsm #(
           local_buffer_A[i] <= A_data_out;
           local_buffer_B[i] <= B_data_out;
         end else begin
-          local_buffer_A[i] <= 32'b0;
-          local_buffer_B[i] <= 32'b0;
+          local_buffer_A[i] <= {(DATA_BITS_LB_IN){1'b0}};
+          local_buffer_B[i] <= {(DATA_BITS_LB_IN){1'b0}};
         end
         i <= i + 1;
       end
@@ -305,7 +306,7 @@ module TPU_fsm #(
         sa_rst_n_temp <= 1'b0;
         i <= 0;
         j <= 0;
-        for (t = 0; t < 4; t = t + 1) result[t] <= 128'b0;
+        for (t = 0; t < 4; t = t + 1) result[t] <= {(DATA_BITS_LB_OUT){1'b0}};
         Koffset_times <= 0;
         Koffset <= 0;
 
@@ -321,7 +322,7 @@ module TPU_fsm #(
         sa_rst_n_temp <= 1'b0;
         i <= 0;
         j <= 0;
-        for (t = 0; t < 4; t = t + 1) result[t] <= 128'b0;
+        for (t = 0; t < 4; t = t + 1) result[t] <= {(DATA_BITS_LB_OUT){1'b0}};
         Koffset_times <= 0;
         Koffset <= 0;
 
