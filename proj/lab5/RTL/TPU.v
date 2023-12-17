@@ -10,126 +10,57 @@ module TPU #(
     parameter DATA_BITS_GB_IN  = DATA_BITS * 4,
     parameter DATA_BITS_GB_OUT = ((DATA_BITS * 2) *4) * 2
 ) (
-    clk,
-    rst_n,
+  input clk,
+  input rst_n,
+  input in_valid,
+  input [31:0] K,
+  input [31:0] M,
+  input [31:0] N,
+  output busy,
+  output [3:0] state_TPU_o,
+  output [2:0] state_SA_o,
 
-    state_TPU_o,
-    state_SA_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_A0_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_A1_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_A2_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_A3_o,
 
-    local_buffer_A0_o,
-    local_buffer_A1_o,
-    local_buffer_A2_o,
-    local_buffer_A3_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_B0_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_B1_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_B2_o,
+  output [DATA_BITS_LB_IN-1:0] local_buffer_B3_o,
 
-    local_buffer_B0_o,
-    local_buffer_B1_o,
-    local_buffer_B2_o,
-    local_buffer_B3_o,
+  output [DATA_BITS_LB_OUT-1:0] local_buffer_C0_o,
+  output [DATA_BITS_LB_OUT-1:0] local_buffer_C1_o,
+  output [DATA_BITS_LB_OUT-1:0] local_buffer_C2_o,
+  output [DATA_BITS_LB_OUT-1:0] local_buffer_C3_o,
 
-    local_buffer_C0_o,
-    local_buffer_C1_o,
-    local_buffer_C2_o,
-    local_buffer_C3_o,
+  output [DATA_BITS_BLOCK_OUT-1:0] result0_o,
 
-    result0_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_north0_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_north1_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_north2_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_north3_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_west0_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_west4_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_west8_o,
+  output [DATA_BITS_BLOCK_IN-1:0] inp_west12_o,
 
-    inp_north0_o,
-    inp_north1_o,
-    inp_north2_o,
-    inp_north3_o,
-    inp_west0_o,
-    inp_west4_o,
-    inp_west8_o,
-    inp_west12_o,
+  output A_wr_en,
+  output [ADDR_BITS-1:0] A_index,
+  output [DATA_BITS_GB_IN-1:0] A_data_in,
+  input [DATA_BITS_GB_IN-1:0] A_data_out,
 
-    in_valid,
-    K,
-    M,
-    N,
-    busy,
+  output B_wr_en,
+  output [ADDR_BITS-1:0] B_index,
+  output [DATA_BITS_GB_IN-1:0] B_data_in,
+  input [DATA_BITS_GB_IN:0] B_data_out,
 
-    A_wr_en,
-    A_index,
-    A_data_in,
-    A_data_out,
-
-    B_wr_en,
-    B_index,
-    B_data_in,
-    B_data_out,
-
-    C_wr_en,
-    C_index,
-    C_data_in,
-    C_data_out
+  output C_wr_en,
+  output [ADDR_BITS-1:0] C_index,
+  output [DATA_BITS_GB_OUT:0] C_data_in,
+  input [DATA_BITS_GB_OUT:0] C_data_out
 );
-
-  input clk;
-  input rst_n;
-  input in_valid;
-  input [31:0] K;
-  input [31:0] M;
-  input [31:0] N;
-  output busy;
-  output [3:0] state_TPU_o;
-  output [2:0] state_SA_o;
-
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A0_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A1_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A2_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A3_o;
-
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B0_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B1_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B2_o;
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B3_o;
-
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C0_o;
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C1_o;
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C2_o;
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C3_o;
-
-  output [DATA_BITS_BLOCK_OUT-1:0] result0_o;
-
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north0_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north1_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north2_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north3_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west0_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west4_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west8_o;
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west12_o;
-
-  output A_wr_en;
-  output [ADDR_BITS-1:0] A_index;
-  output [DATA_BITS_GB_IN-1:0] A_data_in;
-  input [DATA_BITS_GB_IN-1:0] A_data_out;
-
-  output B_wr_en;
-  output [ADDR_BITS-1:0] B_index;
-  output [DATA_BITS_GB_IN-1:0] B_data_in;
-  input [DATA_BITS_GB_IN:0] B_data_out;
-
-  output C_wr_en;
-  output [ADDR_BITS-1:0] C_index;
-  output [DATA_BITS_GB_OUT:0] C_data_in;
-  input [DATA_BITS_GB_OUT:0] C_data_out;
-
-  reg  [31:0] addr_w0;
-  reg  [31:0] addr_w1;
-  reg  [31:0] addr_w2;
-  reg  [31:0] addr_w3;
-
-  reg  [31:0] addr_n0;
-  reg  [31:0] addr_n1;
-  reg  [31:0] addr_n2;
-  reg  [31:0] addr_n3;
-
-  wire        result_matrix_M;
-  wire        result_matrix_N;
-  wire        accuminate_time_K;
-  wire        offset_K;
-  wire [ 3:0] count;
 
   assign local_buffer_A0_o = local_buffer_A0;
   assign local_buffer_A1_o = local_buffer_A1;
