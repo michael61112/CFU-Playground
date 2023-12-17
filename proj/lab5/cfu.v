@@ -7,9 +7,9 @@
 
 module Cfu
 #(  parameter ADDR_BITS=8,
-
-    parameter DATA_BITS=32,
-    parameter DATAC_BITS=128,
+    parameter DATA_BITS = 8,
+    parameter DATA_BITS_GB_IN = DATA_BITS * 4,
+    parameter DATA_BITS_GB_OUT = ((DATA_BITS * 2) * 4) * 2,
     parameter S0 = 4'b0000,
     parameter S1 = 4'b0001,
     parameter S2 = 4'b0010,
@@ -36,7 +36,7 @@ module Cfu
 
 	global_buffer #(
 	    .ADDR_BITS(ADDR_BITS),
-	    .DATA_BITS(32)
+	    .DATA_BITS(DATA_BITS_GB_IN)
 	)
 	gbuff_A(
 	    .clk(clk),
@@ -49,7 +49,7 @@ module Cfu
 
 	global_buffer #(
 	    .ADDR_BITS(ADDR_BITS),
-	    .DATA_BITS(32)
+	    .DATA_BITS(DATA_BITS_GB_IN)
 	) gbuff_B(
 	    .clk(clk),
 	    .rst_n(rst_n),
@@ -61,7 +61,7 @@ module Cfu
 
 	global_buffer #(
 	    .ADDR_BITS(ADDR_BITS),
-	    .DATA_BITS(DATAC_BITS)
+	    .DATA_BITS(DATA_BITS_GB_OUT)
 	) gbuff_C(
 	    .clk(clk),
 	    .rst_n(rst_n),
@@ -74,8 +74,8 @@ reg rst_n;
 reg in_valid;
 
 reg [31:0] K, M, N;
-wire [31:0] A_data_out, B_data_out;
-wire [DATAC_BITS-1:0] C_data_out;
+wire [DATA_BITS_GB_IN-1:0] A_data_out, B_data_out;
+wire [DATA_BITS_GB_OUT-1:0] C_data_out;
 wire [6:0] op;
 wire busy;
 assign op = cmd_payload_function_id[9:3];
@@ -86,9 +86,9 @@ wire C_wr_en_mux;
 wire [ADDR_BITS-1:0] A_index_mux;
 wire [ADDR_BITS-1:0] B_index_mux;
 wire [ADDR_BITS-1:0] C_index_mux;
-wire [31:0] A_data_in_mux;
-wire [31:0] B_data_in_mux;
-wire [DATAC_BITS-1:0] C_data_in_mux;
+wire [DATA_BITS_GB_IN-1:0] A_data_in_mux;
+wire [DATA_BITS_GB_IN-1:0] B_data_in_mux;
+wire [DATA_BITS_GB_OUT-1:0] C_data_in_mux;
 
 reg A_wr_en_init;
 reg B_wr_en_init;
@@ -96,31 +96,16 @@ reg C_wr_en_init;
 
 wire A_wr_en, B_wr_en, C_wr_en;
 wire [ADDR_BITS-1:0] A_index, B_index, C_index;
-wire [31:0] A_data_in, B_data_in;
-wire [DATAC_BITS-1:0] C_data_in;
+wire [DATA_BITS_GB_IN-1:0] A_data_in, B_data_in;
+wire [DATA_BITS_GB_OUT-1:0] C_data_in;
 wire [3:0] state_TPU_o;
 reg [ADDR_BITS-1:0] A_index_init;
 reg [ADDR_BITS-1:0] B_index_init;
 reg [ADDR_BITS-1:0] C_index_init;
 
-reg [31:0] A_data_in_init;
-reg [31:0] B_data_in_init;
-reg [DATAC_BITS-1:0] C_data_in_init;
-
-wire [DATA_BITS-1:0] local_buffer_A0_o;
-wire [DATA_BITS-1:0] local_buffer_A1_o;
-wire [DATA_BITS-1:0] local_buffer_A2_o;
-wire [DATA_BITS-1:0] local_buffer_A3_o;
-
-wire [DATA_BITS-1:0] local_buffer_B0_o;
-wire [DATA_BITS-1:0] local_buffer_B1_o;
-wire [DATA_BITS-1:0] local_buffer_B2_o;
-wire [DATA_BITS-1:0] local_buffer_B3_o;
-
-wire [DATAC_BITS-1:0] local_buffer_C0_o;
-wire [DATAC_BITS-1:0] local_buffer_C1_o;
-wire [DATAC_BITS-1:0] local_buffer_C2_o;
-wire [DATAC_BITS-1:0] local_buffer_C3_o;
+reg [DATA_BITS_GB_IN-1:0] A_data_in_init;
+reg [DATA_BITS_GB_IN-1:0] B_data_in_init;
+reg [DATA_BITS_GB_OUT-1:0] C_data_in_init;
 
 assign A_wr_en_mux = (in_valid | busy) ? A_wr_en : A_wr_en_init;
 assign B_wr_en_mux = (in_valid | busy) ? B_wr_en : B_wr_en_init;
@@ -133,34 +118,11 @@ assign C_index_mux = (busy) ? C_index : C_index_init;
 assign A_data_in_mux = (in_valid) ? A_data_in : A_data_in_init;
 assign B_data_in_mux = (in_valid) ? B_data_in : B_data_in_init;
 assign C_data_in_mux = (busy) ? C_data_in : C_data_in_init;
-/*
-assign A_wr_en_mux =  A_wr_en_init;
-assign B_wr_en_mux =  B_wr_en_init;
-assign A_index_mux =  A_index_init;
-assign B_index_mux =  B_index_init;
-assign A_data_in_mux =  A_data_in_init;
-assign B_data_in_mux =  B_data_in_init;
-*/
+
 	TPU My_TPU(
 	    .clk            (clk),     
 	    .rst_n          (rst_n),  
 	    .state_TPU_o    (state_TPU_o),
-
-    .local_buffer_A0_o (local_buffer_A0_o),
-    .local_buffer_A1_o (local_buffer_A1_o),
-    .local_buffer_A2_o (local_buffer_A2_o),
-    .local_buffer_A3_o (local_buffer_A3_o),
-
-    .local_buffer_B0_o (local_buffer_B0_o),
-    .local_buffer_B1_o (local_buffer_B1_o),
-    .local_buffer_B2_o (local_buffer_B2_o),
-    .local_buffer_B3_o (local_buffer_B3_o),
-
-    .local_buffer_C0_o (local_buffer_C0_o),
-    .local_buffer_C1_o (local_buffer_C1_o),
-    .local_buffer_C2_o (local_buffer_C2_o),
-    .local_buffer_C3_o (local_buffer_C3_o),
-   
 	    .in_valid       (in_valid),         
 	    .K              (K), 
 	    .M              (M), 
@@ -355,25 +317,25 @@ assign B_data_in_mux =  B_data_in_init;
 	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
-	rsp_payload_outputs_0 <= C_data_out[31:0];
+	rsp_payload_outputs_0 <= C_data_out[DATA_BITS_GB_IN-1:0];
       end
       S7: begin // Wait one cycle output buffer C
 	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
-	rsp_payload_outputs_0 <= C_data_out[63:32];
+	rsp_payload_outputs_0 <= C_data_out[DATA_BITS_GB_IN*2-1:DATA_BITS_GB_IN];
       end
       S8: begin // Wait one cycle output buffer C
 	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
-	rsp_payload_outputs_0 <= C_data_out[95:64];
+	rsp_payload_outputs_0 <= C_data_out[DATA_BITS_GB_IN*3-1:DATA_BITS_GB_IN*2];
       end
       S9: begin // Wait one cycle output buffer C
 	//rst_n <= 1'b1;
 	cmd_ready <= 1'b0;
 	rsp_valid <= 1'b0;
-	rsp_payload_outputs_0 <= C_data_out[127:96];
+	rsp_payload_outputs_0 <= C_data_out[DATA_BITS_GB_OUT-1:DATA_BITS_GB_IN*3];
       end
     endcase
   end
