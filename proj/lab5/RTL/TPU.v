@@ -1,65 +1,65 @@
 //`include "systolic_array.v"
 //`include "TPU_fsm.v"
 module TPU #(
-    parameter ADDR_BITS  = 16,
-    parameter DATA_BITS  = 8,
-    parameter DATA_BITS_BLOCK_IN  = DATA_BITS * 2,
-    parameter DATA_BITS_BLOCK_OUT  = DATA_BITS_BLOCK_IN * 2,
+    parameter ADDR_BITS = 16,
+    parameter DATA_BITS = 8,
+    parameter DATA_BITS_BLOCK_IN = DATA_BITS * 2,
+    parameter DATA_BITS_BLOCK_OUT = DATA_BITS_BLOCK_IN * 2,
     parameter DATA_BITS_LB_IN = (DATA_BITS * 2) * 4,
     parameter DATA_BITS_LB_OUT = DATA_BITS_LB_IN * 2,
-    parameter DATA_BITS_GB_IN  = DATA_BITS * 4,
-    parameter DATA_BITS_GB_OUT = ((DATA_BITS * 2) *4) * 2
+    parameter DATA_BITS_GB_IN = DATA_BITS * 4,
+    parameter DATA_BITS_GB_OUT = ((DATA_BITS * 2) * 4) * 2
 ) (
-  input clk,
-  input rst_n,
-  input in_valid,
-  input [31:0] K,
-  input [31:0] M,
-  input [31:0] N,
-  output busy,
-  output [3:0] state_TPU_o,
-  output [2:0] state_SA_o,
+    input clk,
+    input rst_n,
+    input in_valid,
+    input [31:0] K,
+    input [31:0] M,
+    input [31:0] N,
+    output busy,
+    output [3:0] state_TPU_o,
+    output [2:0] state_SA_o,
 
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A0_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A1_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A2_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_A3_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A0_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A1_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A2_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_A3_o,
 
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B0_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B1_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B2_o,
-  output [DATA_BITS_LB_IN-1:0] local_buffer_B3_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B0_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B1_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B2_o,
+    output [DATA_BITS_LB_IN-1:0] local_buffer_B3_o,
 
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C0_o,
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C1_o,
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C2_o,
-  output [DATA_BITS_LB_OUT-1:0] local_buffer_C3_o,
+    output [DATA_BITS_LB_OUT-1:0] local_buffer_C0_o,
+    output [DATA_BITS_LB_OUT-1:0] local_buffer_C1_o,
+    output [DATA_BITS_LB_OUT-1:0] local_buffer_C2_o,
+    output [DATA_BITS_LB_OUT-1:0] local_buffer_C3_o,
 
-  output [DATA_BITS_BLOCK_OUT-1:0] result0_o,
+    output [DATA_BITS_BLOCK_OUT-1:0] result0_o,
 
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north0_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north1_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north2_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_north3_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west0_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west4_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west8_o,
-  output [DATA_BITS_BLOCK_IN-1:0] inp_west12_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_north0_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_north1_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_north2_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_north3_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_west0_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_west4_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_west8_o,
+    output [DATA_BITS_BLOCK_IN-1:0] inp_west12_o,
 
-  output A_wr_en,
-  output [ADDR_BITS-1:0] A_index,
-  output [DATA_BITS_GB_IN-1:0] A_data_in,
-  input [DATA_BITS_GB_IN-1:0] A_data_out,
+    output A_wr_en,
+    output [ADDR_BITS-1:0] A_index,
+    output [DATA_BITS_GB_IN-1:0] A_data_in,
+    input [DATA_BITS_GB_IN-1:0] A_data_out,
 
-  output B_wr_en,
-  output [ADDR_BITS-1:0] B_index,
-  output [DATA_BITS_GB_IN-1:0] B_data_in,
-  input [DATA_BITS_GB_IN:0] B_data_out,
+    output B_wr_en,
+    output [ADDR_BITS-1:0] B_index,
+    output [DATA_BITS_GB_IN-1:0] B_data_in,
+    input [DATA_BITS_GB_IN:0] B_data_out,
 
-  output C_wr_en,
-  output [ADDR_BITS-1:0] C_index,
-  output [DATA_BITS_GB_OUT:0] C_data_in,
-  input [DATA_BITS_GB_OUT:0] C_data_out
+    output C_wr_en,
+    output [ADDR_BITS-1:0] C_index,
+    output [DATA_BITS_GB_OUT:0] C_data_in,
+    input [DATA_BITS_GB_OUT:0] C_data_out
 );
 
   assign local_buffer_A0_o = local_buffer_A0;
@@ -90,7 +90,7 @@ module TPU #(
   wire [DATA_BITS_LB_OUT-1:0] local_buffer_C1;
   wire [DATA_BITS_LB_OUT-1:0] local_buffer_C2;
   wire [DATA_BITS_LB_OUT-1:0] local_buffer_C3;
-  
+
   TPU_fsm TPU_fsm1 (
       .clk(clk),
       .rst_n(rst_n),
@@ -132,7 +132,9 @@ module TPU #(
       .local_buffer_C3(local_buffer_C3)
   );
 
-  systolic_array #(.DATA_BITS_(DATA_BITS*2)) systolic_array1 (
+  systolic_array #(
+      .DATA_BITS(DATA_BITS * 2)
+  ) systolic_array1 (
 
       .clk(clk),
       .sa_rst_n(sa_rst_n),
