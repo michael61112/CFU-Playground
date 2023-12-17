@@ -1,6 +1,7 @@
 module TPU_fsm #(
     parameter ADDR_BITS = 16,
     parameter DATA_BITS = 8,
+    parameter DATA_BITS_BLOCK_IN = DATA_BITS * 2,
     parameter DATA_BITS_LB_IN = (DATA_BITS * 2) * 4,
     parameter DATA_BITS_LB_OUT = DATA_BITS_LB_IN * 2,
     parameter DATA_BITS_GB_IN = DATA_BITS * 4,
@@ -121,8 +122,8 @@ module TPU_fsm #(
   assign C_index   = C_index_temp;
   assign C_data_in = C_data_in_temp;
 
-  reg [DATA_BITS_LB_IN-1:0] local_buffer_A[3:0];
-  reg [DATA_BITS_LB_IN-1:0] local_buffer_B[3:0];
+  reg signed [DATA_BITS_LB_IN-1:0] local_buffer_A[3:0];
+  reg signed [DATA_BITS_LB_IN-1:0] local_buffer_B[3:0];
 
   assign local_buffer_A0 = local_buffer_A[0];
   assign local_buffer_A1 = local_buffer_A[1];
@@ -249,8 +250,16 @@ module TPU_fsm #(
         sa_rst_n_temp <= 1'b0;
 
         if (A_index_temp < K_reg * (Moffset_times + 1)) begin
-          local_buffer_A[i] <= A_data_out;
-          local_buffer_B[i] <= B_data_out;
+          // Signed Extension
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3]);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2]);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS]);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(A_data_out[DATA_BITS-1:0]);
+
+          local_buffer_B[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(B_data_out[DATA_BITS*4-1:DATA_BITS*3]);
+          local_buffer_B[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(B_data_out[DATA_BITS*3-1:DATA_BITS*2]);
+          local_buffer_B[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(B_data_out[DATA_BITS*2-1:DATA_BITS]);
+          local_buffer_B[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(B_data_out[DATA_BITS-1:0]);
         end else begin
           local_buffer_A[i] <= {(DATA_BITS_LB_IN) {1'b0}};
           local_buffer_B[i] <= {(DATA_BITS_LB_IN) {1'b0}};
