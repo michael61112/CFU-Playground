@@ -24,12 +24,16 @@ SOFTWARE.
 
 */
 
-module block(inp_north, inp_west, clk, rst, outp_south, outp_east, result);
-	input signed [7:0] inp_north, inp_west;
-	output reg signed [7:0] outp_south, outp_east;
-	input clk, rst;
-	output reg signed [31:0] result;
-	wire [31:0] multi;
+module block #(
+    parameter DATA_BITS = 16
+)  (
+    input signed [DATA_BITS-1:0] inp_north, inp_west,
+    input clk, rst,
+    output reg signed [DATA_BITS-1:0] outp_south, outp_east,
+    output reg signed [DATA_BITS*2-1:0] result
+  );
+
+	wire [DATA_BITS*2-1:0] multi;
 	always @(posedge rst or posedge clk) begin
 		if(rst) begin
 			result <= 0;
