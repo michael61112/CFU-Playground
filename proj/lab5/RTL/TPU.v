@@ -132,7 +132,7 @@ module TPU #(
       .local_buffer_C3(local_buffer_C3)
   );
 
-  systolic_array #(DATA_BITS=DATA_BITS*2) systolic_array1 (
+  systolic_array #(.DATA_BITS_(DATA_BITS*2)) systolic_array1 (
 
       .clk(clk),
       .sa_rst_n(sa_rst_n),
