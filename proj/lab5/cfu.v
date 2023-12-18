@@ -88,7 +88,8 @@ module Cfu #(
       .C_wr_en    (C_wr_en),
       .C_index    (C_index),
       .C_data_in  (C_data_in),
-      .C_data_out (C_data_out)
+      .C_data_out (C_data_out),
+      .inputOffset(inputOffset)
   );
 
   reg rst_n;
@@ -114,6 +115,7 @@ module Cfu #(
   reg A_wr_en_init;
   reg B_wr_en_init;
   reg C_wr_en_init;
+  reg [DATA_BITS-1:0] inputOffset;
 
   wire A_wr_en, B_wr_en, C_wr_en;
   wire [ADDR_BITS-1:0] A_index, B_index, C_index;
@@ -219,6 +221,7 @@ module Cfu #(
             K = 'bx;
             M = 'bx;
             N = 'bx;
+            inputOffset = 'bx;
           end
           7'd2: begin  // Set parameter K
             K <= cmd_payload_inputs_0;
@@ -287,6 +290,9 @@ module Cfu #(
           7'd17: begin  // Read global bufer C
             C_wr_en_init <= 1'b0;
             C_index_init <= cmd_payload_inputs_0[ADDR_BITS-1:0];
+          end
+          7'd18: begin  // Set InputOffset
+            inputOffset <= cmd_payload_inputs_0[DATA_BITS-1:0];
           end
         endcase
       end

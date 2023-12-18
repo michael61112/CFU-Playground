@@ -120,6 +120,7 @@ void matrix_multiply2D_acc(int M, int N, int K) {
   cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
   cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
   cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
+  cfu_op0(/* funct7= */ 18, /* in0= */ -1, /* in1= */ -1);  // Set parameter inputOffset
 
   printf("\nMatrix A for global buffer =\n");
   int calignA = int((M + 3) / 4) * 4;
@@ -247,6 +248,7 @@ void matrix_multiply2D_acc_block(int baseM, int baseN, int baseK, int blockSize)
   cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
   cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
   cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
+  cfu_op0(/* funct7= */ 18, /* in0= */ -1, /* in1= */ -1);  // Set parameter inputOffset
 
   //printf("\nMatrix A for global buffer =\n");
   int calignA = int((M + 3) / 4) * 4;

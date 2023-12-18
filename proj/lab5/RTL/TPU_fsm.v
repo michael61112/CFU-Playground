@@ -17,14 +17,15 @@ module TPU_fsm #(
     parameter S8 = 4'b1000,
     parameter S9 = 4'b1001
 ) (
-    input  wire        clk,
-    input  wire        rst_n,
-    output wire [ 3:0] state_TPU_o,
-    input              in_valid,
-    input              done,
-    input       [31:0] K,
-    input       [31:0] M,
-    input       [31:0] N,
+    input  wire                 clk,
+    input  wire                 rst_n,
+    output wire [          3:0] state_TPU_o,
+    input                       in_valid,
+    input                       done,
+    input       [         31:0] K,
+    input       [         31:0] M,
+    input       [         31:0] N,
+    input       [DATA_BITS-1:0] inputOffset,
 
     output busy,
     output sa_rst_n,
@@ -251,10 +252,10 @@ module TPU_fsm #(
 
         if (A_index_temp < K_reg * (Moffset_times + 1)) begin
           // Signed Extension
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3]);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2]);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS]);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(A_data_out[DATA_BITS-1:0]);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS] + inputOffset);
+          local_buffer_A[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(A_data_out[DATA_BITS-1:0] + inputOffset);
 
           local_buffer_B[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(B_data_out[DATA_BITS*4-1:DATA_BITS*3]);
           local_buffer_B[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(B_data_out[DATA_BITS*3-1:DATA_BITS*2]);
