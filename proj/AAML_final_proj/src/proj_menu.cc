@@ -248,7 +248,7 @@ void matrix_multiply2D_acc_block(int baseM, int baseN, int baseK, int blockSize)
   cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
   cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
 
-  printf("\nMatrix A for global buffer =\n");
+  //printf("\nMatrix A for global buffer =\n");
   int calignA = int((M + 3) / 4) * 4;
   int16_t addr = 0;
   for (int dr = baseM; dr < baseM + calignA; dr += 4) {
@@ -294,7 +294,7 @@ void matrix_multiply2D_acc_block(int baseM, int baseN, int baseK, int blockSize)
       addr++;
     }
   }
-  printf("\nMatrix B for global buffer =\n");
+  //printf("\nMatrix B for global buffer =\n");
   int calignB = int((N + 3) / 4) * 4;
   addr = 0;
   for (int cptr = baseN; cptr < baseN + calignB; cptr += 4) {
@@ -456,10 +456,10 @@ void block_matrix(int M, int K, int N, int negtive) {
   }
 }
 
-void calculate_2by3() { block_matrix(2, 3, 2); }
-void calculate_4by4() { block_matrix(4, 4, 4); }
-void calculate_5by5() { block_matrix(5, 5, 5); }
-void calculate_7by5() { block_matrix(7, 6, 5); }
+void calculate_2by3() { matrix(2, 3, 2, 0); }
+void calculate_4by4() { matrix(4, 4, 4, 0); }
+void calculate_5by5() { matrix(5, 5, 5, 0); }
+void calculate_7by5() { matrix(7, 6, 5, 0); }
 
 void block_matrix_7by5() { block_matrix(7, 6, 5, 0); }
 void block_matrix_2by3() { block_matrix(2, 3, 3, 0); }
