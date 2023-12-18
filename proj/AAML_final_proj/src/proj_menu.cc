@@ -107,627 +107,134 @@ void read_write_cfu(void) {
          addr + 1000, ret2);
 }
 
-void calculate_4by4(void) {
-  int32_t matrix_fmaps[4][4];
-  int32_t matrix_filter[4][4];
-  int32_t matrix_result[4][4];
-  int K = 4;
-  int M = 4;
-  int N = 4;
-  printf("Matrix A =\n");
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < K; j++) {
-      matrix_fmaps[i][j] = j + K * i;
-      printf("%ld\t", matrix_fmaps[i][j]);
-    }
-    printf("\n");
-  }
-  printf("\nMatrix B =\n");
-  for (int i = 0; i < K; i++) {
-    for (int j = 0; j < N; j++) {
-      matrix_filter[i][j] = j + N * i;
-      printf("%ld\t", matrix_filter[i][j]);
-    }
-    printf("\n");
-  }
-
-  //--------------------------------------------------
-  printf("Reset TPU\n");
-  cfu_op0(1, 0, 0);  // reset
-  cfu_op0(1, 1, 0);
-  //--------------------------------------------------
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
-
-  printf("\nMatrix A for global buffer =\n");
-  int calignA = int((M + 3) / 4) * 4;
-  int16_t addr = 0;
-  for (int dr = 0; dr < calignA; dr += 4) {
-    for (int cptr = 0; cptr < K; cptr += 1) {
-      int32_t in_data4 = 0;
-
-      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
-      // if K M >4
-      if (dr < K - 1) {
-        a3 = matrix_fmaps[dr + 3][cptr];
-        a2 = matrix_fmaps[dr + 2][cptr];
-        a1 = matrix_fmaps[dr + 1][cptr];
-        a0 = matrix_fmaps[dr + 0][cptr];
-      } else {
-        switch (K % 4) {
-          case 1:
-            a3 = 0;
-            a2 = 0;
-            a1 = 0;
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 2:
-            a3 = 0;
-            a2 = 0;
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 3:
-            a3 = 0;
-            a2 = matrix_fmaps[dr + 2][cptr];
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-        }
-      }
-      in_data4 |= (a3 & 0xFF);
-      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
-
-      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
-      cfu_op0(8, addr, in_data4);  // Set global bufer A
-      addr++;
-    }
-  }
-  printf("\nMatrix B for global buffer =\n");
-  int calignB = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignB; cptr += 4) {
-    for (int dr = 0; dr < K; dr++) {
-      int32_t in_data4 = 0;
-      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
-      // if M N >4
-      if (cptr < N - 1) {
-        b3 = matrix_filter[dr][cptr + 3];
-        b2 = matrix_filter[dr][cptr + 2];
-        b1 = matrix_filter[dr][cptr + 1];
-        b0 = matrix_filter[dr][cptr + 0];
-      } else {
-        switch (N % 4) {
-          case 1:
-            b3 = 0;
-            b2 = 0;
-            b1 = 0;
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 2:
-            b3 = 0;
-            b2 = 0;
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 3:
-            b3 = 0;
-            b2 = matrix_filter[dr][cptr + 2];
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-        }
-      }
-      in_data4 |= (b3 & 0xFF);
-      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
-      cfu_op0(10, addr, in_data4);  // Set global bufer B
-      addr++;
-    }
-  }
-  //--------------------------------------------------
-  printf("In valid\n");
-  cfu_op0(12, 0, 0);
-  //--------------------------------------------------
-  // Check Status
-  while (1) {
-    int busy = cfu_op0(13, 0, 0);
-    if (!busy) break;
-  }
-
-  int calignC = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignC; cptr += 4) {
-    for (int dr = 0; dr < M; dr++) {
-
-      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
-      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
-      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
-      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
-      addr++;
-    }
-  }
-
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < N; j++) {
-      printf("%ld\t", matrix_result[i][j]);
-    }
-    printf("\n");
-  }
-}
-
-void calculate_5by5(void) {
-  int32_t matrix_fmaps[15][15];
-  int32_t matrix_filter[15][15];
-  int32_t matrix_result[15][15];
-  int K = 5;
-  int M = 5;
-  int N = 5;
-  printf("Matrix A =\n");
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < K; j++) {
-      matrix_fmaps[i][j] = j + K * i;
-      printf("%ld\t", matrix_fmaps[i][j]);
-    }
-    printf("\n");
-  }
-  printf("\nMatrix B =\n");
-  for (int i = 0; i < K; i++) {
-    for (int j = 0; j < N; j++) {
-      matrix_filter[i][j] = j + N * i;
-      printf("%ld\t", matrix_filter[i][j]);
-    }
-    printf("\n");
-  }
-
-  //--------------------------------------------------
-  printf("Reset TPU\n");
-  cfu_op0(1, 0, 0);  // reset
-  cfu_op0(1, 1, 0);
-  //--------------------------------------------------
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
-
-  printf("\nMatrix A for global buffer =\n");
-  int calignA = int((M + 3) / 4) * 4;
-  int16_t addr = 0;
-  for (int dr = 0; dr < calignA; dr += 4) {
-    for (int cptr = 0; cptr < K; cptr += 1) {
-      int32_t in_data4 = 0;
-
-      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
-      // if K M >4
-      if (dr < K - 1) {
-        a3 = matrix_fmaps[dr + 3][cptr];
-        a2 = matrix_fmaps[dr + 2][cptr];
-        a1 = matrix_fmaps[dr + 1][cptr];
-        a0 = matrix_fmaps[dr + 0][cptr];
-      } else {
-        switch (K % 4) {
-          case 1:
-            a3 = 0;
-            a2 = 0;
-            a1 = 0;
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 2:
-            a3 = 0;
-            a2 = 0;
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 3:
-            a3 = 0;
-            a2 = matrix_fmaps[dr + 2][cptr];
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-        }
-      }
-      in_data4 |= (a3 & 0xFF);
-      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
-
-      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
-      cfu_op0(8, addr, in_data4);  // Set global bufer A
-      addr++;
-    }
-  }
-  printf("\nMatrix B for global buffer =\n");
-  int calignB = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignB; cptr += 4) {
-    for (int dr = 0; dr < K; dr++) {
-      int32_t in_data4 = 0;
-      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
-      // if M N >4
-      if (cptr < N - 1) {
-        b3 = matrix_filter[dr][cptr + 3];
-        b2 = matrix_filter[dr][cptr + 2];
-        b1 = matrix_filter[dr][cptr + 1];
-        b0 = matrix_filter[dr][cptr + 0];
-      } else {
-        switch (N % 4) {
-          case 1:
-            b3 = 0;
-            b2 = 0;
-            b1 = 0;
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 2:
-            b3 = 0;
-            b2 = 0;
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 3:
-            b3 = 0;
-            b2 = matrix_filter[dr][cptr + 2];
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-        }
-      }
-      in_data4 |= (b3 & 0xFF);
-      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
-      cfu_op0(10, addr, in_data4);  // Set global bufer B
-      addr++;
-    }
-  }
-  //--------------------------------------------------
-  printf("In valid\n");
-  cfu_op0(12, 0, 0);
-  //--------------------------------------------------
-  // Check Status
-  while (1) {
-    int busy = cfu_op0(13, 0, 0);
-    if (!busy) break;
-  }
-
-  int calignC = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignC; cptr += 4) {
-    for (int dr = 0; dr < M; dr++) {
-
-      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
-      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
-      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
-      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
-      addr++;
-    }
-  }
-
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < N; j++) {
-      printf("%ld\t", matrix_result[i][j]);
-    }
-    printf("\n");
-  }
-}
-
-void calculate_7by5(void) {
-  int32_t matrix_fmaps[15][15];
-  int32_t matrix_filter[15][15];
-  int32_t matrix_result[15][15];
-  int K = 6;
-  int M = 7;
-  int N = 5;
-  printf("Matrix A =\n");
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < K; j++) {
-      matrix_fmaps[i][j] = j + K * i;
-      printf("%ld\t", matrix_fmaps[i][j]);
-    }
-    printf("\n");
-  }
-  printf("\nMatrix B =\n");
-  for (int i = 0; i < K; i++) {
-    for (int j = 0; j < N; j++) {
-      matrix_filter[i][j] = j + N * i;
-      printf("%ld\t", matrix_filter[i][j]);
-    }
-    printf("\n");
-  }
-
-  //--------------------------------------------------
-  printf("Reset TPU\n");
-  cfu_op0(1, 0, 0);  // reset
-  cfu_op0(1, 1, 0);
-  //--------------------------------------------------
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
-
-  printf("\nMatrix A for global buffer =\n");
-  int calignA = int((M + 3) / 4) * 4;
-  int16_t addr = 0;
-  for (int dr = 0; dr < calignA; dr += 4) {
-    for (int cptr = 0; cptr < K; cptr += 1) {
-      int32_t in_data4 = 0;
-
-      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
-      // if K M >4
-      if (dr < K - 1) {
-        a3 = matrix_fmaps[dr + 3][cptr];
-        a2 = matrix_fmaps[dr + 2][cptr];
-        a1 = matrix_fmaps[dr + 1][cptr];
-        a0 = matrix_fmaps[dr + 0][cptr];
-      } else {
-        switch (K % 4) {
-          case 1:
-            a3 = 0;
-            a2 = 0;
-            a1 = 0;
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 2:
-            a3 = 0;
-            a2 = 0;
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 3:
-            a3 = 0;
-            a2 = matrix_fmaps[dr + 2][cptr];
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-        }
-      }
-      in_data4 |= (a3 & 0xFF);
-      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
-
-      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
-      cfu_op0(8, addr, in_data4);  // Set global bufer A
-      addr++;
-    }
-  }
-  printf("\nMatrix B for global buffer =\n");
-  int calignB = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignB; cptr += 4) {
-    for (int dr = 0; dr < K; dr++) {
-      int32_t in_data4 = 0;
-      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
-      // if M N >4
-      if (cptr < N - 1) {
-        b3 = matrix_filter[dr][cptr + 3];
-        b2 = matrix_filter[dr][cptr + 2];
-        b1 = matrix_filter[dr][cptr + 1];
-        b0 = matrix_filter[dr][cptr + 0];
-      } else {
-        switch (N % 4) {
-          case 1:
-            b3 = 0;
-            b2 = 0;
-            b1 = 0;
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 2:
-            b3 = 0;
-            b2 = 0;
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 3:
-            b3 = 0;
-            b2 = matrix_filter[dr][cptr + 2];
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-        }
-      }
-      in_data4 |= (b3 & 0xFF);
-      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
-      cfu_op0(10, addr, in_data4);  // Set global bufer B
-      addr++;
-    }
-  }
-  //--------------------------------------------------
-  printf("In valid\n");
-  cfu_op0(12, 0, 0);
-  //--------------------------------------------------
-  // Check Status
-  while (1) {
-    int busy = cfu_op0(13, 0, 0);
-    if (!busy) break;
-  }
-
-  int calignC = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignC; cptr += 4) {
-    for (int dr = 0; dr < M; dr++) {
-
-      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
-      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
-      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
-      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
-      addr++;
-    }
-  }
-
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < N; j++) {
-      printf("%ld\t", matrix_result[i][j]);
-    }
-    printf("\n");
-  }
-}
-
-void calculate_2by3(void) {
-  int32_t matrix_fmaps[15][15];
-  int32_t matrix_filter[15][15];
-  int32_t matrix_result[15][15];
-  int K = 3;
-  int M = 2;
-  int N = 3;
-  printf("Matrix A =\n");
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < K; j++) {
-      matrix_fmaps[i][j] = j + K * i;
-      printf("%ld\t", matrix_fmaps[i][j]);
-    }
-    printf("\n");
-  }
-  printf("\nMatrix B =\n");
-  for (int i = 0; i < K; i++) {
-    for (int j = 0; j < N; j++) {
-      matrix_filter[i][j] = j + N * i;
-      printf("%ld\t", matrix_filter[i][j]);
-    }
-    printf("\n");
-  }
-
-  //--------------------------------------------------
-  printf("Reset TPU\n");
-  cfu_op0(1, 0, 0);  // reset
-  cfu_op0(1, 1, 0);
-  //--------------------------------------------------
-  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
-  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
-  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
-
-  printf("\nMatrix A for global buffer =\n");
-  int calignA = int((M + 3) / 4) * 4;
-  int16_t addr = 0;
-  for (int dr = 0; dr < calignA; dr += 4) {
-    for (int cptr = 0; cptr < K; cptr += 1) {
-      int32_t in_data4 = 0;
-
-      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
-      // if K M >4
-      if (dr < K - 1) {
-        a3 = matrix_fmaps[dr + 3][cptr];
-        a2 = matrix_fmaps[dr + 2][cptr];
-        a1 = matrix_fmaps[dr + 1][cptr];
-        a0 = matrix_fmaps[dr + 0][cptr];
-      } else {
-        switch (K % 4) {
-          case 1:
-            a3 = 0;
-            a2 = 0;
-            a1 = 0;
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 2:
-            a3 = 0;
-            a2 = 0;
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-          case 3:
-            a3 = 0;
-            a2 = matrix_fmaps[dr + 2][cptr];
-            a1 = matrix_fmaps[dr + 1][cptr];
-            a0 = matrix_fmaps[dr + 0][cptr];
-            break;
-        }
-      }
-      in_data4 |= (a3 & 0xFF);
-      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
-
-      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
-      cfu_op0(8, addr, in_data4);  // Set global bufer A
-      addr++;
-    }
-  }
-  printf("\nMatrix B for global buffer =\n");
-  int calignB = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignB; cptr += 4) {
-    for (int dr = 0; dr < K; dr++) {
-      int32_t in_data4 = 0;
-      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
-      // if M N >4
-      if (cptr < N - 1) {
-        b3 = matrix_filter[dr][cptr + 3];
-        b2 = matrix_filter[dr][cptr + 2];
-        b1 = matrix_filter[dr][cptr + 1];
-        b0 = matrix_filter[dr][cptr + 0];
-      } else {
-        switch (N % 4) {
-          case 1:
-            b3 = 0;
-            b2 = 0;
-            b1 = 0;
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 2:
-            b3 = 0;
-            b2 = 0;
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-          case 3:
-            b3 = 0;
-            b2 = matrix_filter[dr][cptr + 2];
-            b1 = matrix_filter[dr][cptr + 1];
-            b0 = matrix_filter[dr][cptr + 0];
-            break;
-        }
-      }
-      in_data4 |= (b3 & 0xFF);
-      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
-      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
-      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
-      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
-      cfu_op0(10, addr, in_data4);  // Set global bufer B
-      addr++;
-    }
-  }
-  //--------------------------------------------------
-  printf("In valid\n");
-  cfu_op0(12, 0, 0);
-  //--------------------------------------------------
-  // Check Status
-  while (1) {
-    int busy = cfu_op0(13, 0, 0);
-    if (!busy) break;
-  }
-
-  int calignC = int((N + 3) / 4) * 4;
-  addr = 0;
-  for (int cptr = 0; cptr < calignC; cptr += 4) {
-    for (int dr = 0; dr < M; dr++) {
-
-      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
-      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
-      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
-      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
-      addr++;
-    }
-  }
-
-  for (int i = 0; i < M; i++) {
-    for (int j = 0; j < N; j++) {
-      printf("%ld\t", matrix_result[i][j]);
-    }
-    printf("\n");
-  }
-}
-//-----------------------------------------------------------
 int32_t matrix_fmaps[100][100];
 int32_t matrix_filter[100][100];
 int32_t matrix_result[100][100];
 
-void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
+void matrix_multiply2D_acc(int M, int N, int K) {
+  //--------------------------------------------------
+  printf("Reset TPU\n");
+  cfu_op0(1, 0, 0);  // reset
+  cfu_op0(1, 1, 0);
+  //--------------------------------------------------
+  cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
+  cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
+  cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
+
+  printf("\nMatrix A for global buffer =\n");
+  int calignA = int((M + 3) / 4) * 4;
+  int16_t addr = 0;
+  for (int dr = 0; dr < calignA; dr += 4) {
+    for (int cptr = 0; cptr < K; cptr += 1) {
+      int32_t in_data4 = 0;
+
+      int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+      // if K M >4
+      if (dr < K - 1) {
+        a3 = matrix_fmaps[dr + 3][cptr];
+        a2 = matrix_fmaps[dr + 2][cptr];
+        a1 = matrix_fmaps[dr + 1][cptr];
+        a0 = matrix_fmaps[dr + 0][cptr];
+      } else {
+        switch (K % 4) {
+          case 1:
+            a3 = 0;
+            a2 = 0;
+            a1 = 0;
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+          case 2:
+            a3 = 0;
+            a2 = 0;
+            a1 = matrix_fmaps[dr + 1][cptr];
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+          case 3:
+            a3 = 0;
+            a2 = matrix_fmaps[dr + 2][cptr];
+            a1 = matrix_fmaps[dr + 1][cptr];
+            a0 = matrix_fmaps[dr + 0][cptr];
+            break;
+        }
+      }
+      in_data4 |= (a3 & 0xFF);
+      in_data4 |= ((int32_t)(a2 & 0xFF) << 8);
+      in_data4 |= ((int32_t)(a1 & 0xFF) << 16);
+      in_data4 |= ((int32_t)(a0 & 0xFF) << 24);
+
+      printf("%ld\t%ld\t%ld\t%ld\n", a0, a1, a2, a3);
+      cfu_op0(8, addr, in_data4);  // Set global bufer A
+      addr++;
+    }
+  }
+  printf("\nMatrix B for global buffer =\n");
+  int calignB = int((N + 3) / 4) * 4;
+  addr = 0;
+  for (int cptr = 0; cptr < calignB; cptr += 4) {
+    for (int dr = 0; dr < K; dr++) {
+      int32_t in_data4 = 0;
+      int32_t b0 = 0, b1 = 0, b2 = 0, b3 = 0;
+      // if M N >4
+      if (cptr < N - 1) {
+        b3 = matrix_filter[dr][cptr + 3];
+        b2 = matrix_filter[dr][cptr + 2];
+        b1 = matrix_filter[dr][cptr + 1];
+        b0 = matrix_filter[dr][cptr + 0];
+      } else {
+        switch (N % 4) {
+          case 1:
+            b3 = 0;
+            b2 = 0;
+            b1 = 0;
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+          case 2:
+            b3 = 0;
+            b2 = 0;
+            b1 = matrix_filter[dr][cptr + 1];
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+          case 3:
+            b3 = 0;
+            b2 = matrix_filter[dr][cptr + 2];
+            b1 = matrix_filter[dr][cptr + 1];
+            b0 = matrix_filter[dr][cptr + 0];
+            break;
+        }
+      }
+      in_data4 |= (b3 & 0xFF);
+      in_data4 |= ((int32_t)(b2 & 0xFF) << 8);
+      in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
+      in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
+      printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
+      cfu_op0(10, addr, in_data4);  // Set global bufer B
+      addr++;
+    }
+  }
+  //--------------------------------------------------
+  printf("In valid\n");
+  cfu_op0(12, 0, 0);
+  //--------------------------------------------------
+  // Check Status
+  while (1) {
+    int busy = cfu_op0(13, 0, 0);
+    if (!busy) break;
+  }
+
+  int calignC = int((N + 3) / 4) * 4;
+  addr = 0;
+  for (int cptr = 0; cptr < calignC; cptr += 4) {
+    for (int dr = 0; dr < M; dr++) {
+      matrix_result[dr][cptr + 3] = cfu_op0(14, addr, 0);
+      matrix_result[dr][cptr + 2] = cfu_op0(15, addr, 0);
+      matrix_result[dr][cptr + 1] = cfu_op0(16, addr, 0);
+      matrix_result[dr][cptr + 0] = cfu_op0(17, addr, 0);
+      addr++;
+    }
+  }
+}
+
+void matrix_multiply2D_acc_block(int baseM, int baseN, int baseK, int blockSize) {
   int K = blockSize;
   int M = blockSize;
   int N = blockSize;
@@ -879,6 +386,21 @@ void prepare_matrixAB(int M, int K, int N, bool negtive) {
     printf("\n");
   }
 }
+
+void matrix(int M, int K, int N, int negtive) {
+  prepare_matrixAB(M, K, N, negtive);
+
+  matrix_multiply2D_acc(M, N, K);
+
+  printf("\nMatrix C =\n");
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+      printf("%ld\t", matrix_result[i][j]);
+    }
+    printf("\n");
+  }
+}
+
 void block_matrix(int M, int K, int N, int negtive) {
 
   prepare_matrixAB(M,K,N,negtive);
@@ -923,7 +445,7 @@ void block_matrix(int M, int K, int N, int negtive) {
   for (int ii = 0; ii < MM; ii+=blockSize)
     for (int jj = 0; jj < NN; jj+=blockSize)
       for (int kk = 0; kk < KK; kk+=blockSize)
-	      matrix_multiply2D_acc(ii, jj, kk, blockSize);
+	      matrix_multiply2D_acc_block(ii, jj, kk, blockSize);
 
   printf("\nMatrix C =\n");
   for (int i = 0; i < M; i++) {
@@ -934,25 +456,18 @@ void block_matrix(int M, int K, int N, int negtive) {
   }
 }
 
-void block_matrix_7by5() {
-	block_matrix(7,6,5,0);
-}
+void calculate_2by3() { block_matrix(2, 3, 2); }
+void calculate_4by4() { block_matrix(4, 4, 4); }
+void calculate_5by5() { block_matrix(5, 5, 5); }
+void calculate_7by5() { block_matrix(7, 6, 5); }
 
-void block_matrix_2by3() {
-	block_matrix(2,3,3,0);
-}
-void block_matrix_4by4() {
-	block_matrix(4,4,4,0);
-}
-void block_matrix_16by5() {
-	block_matrix(16,2,5,0);
-}
-void block_matrix_17by5() {
-	block_matrix(17,2,5,0);
-}
-void block_matrix_4by4n() {
-	block_matrix(4,4,4,1);
-}
+void block_matrix_7by5() { block_matrix(7, 6, 5, 0); }
+void block_matrix_2by3() { block_matrix(2, 3, 3, 0); }
+void block_matrix_4by4() { block_matrix(4, 4, 4, 0); }
+void block_matrix_16by5() { block_matrix(16, 2, 5, 0); }
+void block_matrix_17by5() { block_matrix(17, 2, 5, 0); }
+void block_matrix_4by4n() { block_matrix(4, 4, 4, 1); }
+
 struct Menu MENU = {
     "Project Menu",
     "project",
