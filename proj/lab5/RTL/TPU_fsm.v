@@ -252,15 +252,49 @@ module TPU_fsm #(
 
         if (A_index_temp < K_reg * (Moffset_times + 1)) begin
           // Signed Extension
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS] + inputOffset);
-          local_buffer_A[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(A_data_out[DATA_BITS-1:0] + inputOffset);
-
+          if (Moffset_times != check_Moffset_times) begin // For the case M > 4, but not calculate the last M
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+          end else begin
+            case (M_reg%4)
+              'd0: begin  // For the M <= 4
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+              end
+              'd1: begin
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+              end
+              'd2: begin
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+              end
+              'd3: begin
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+              end
+              default begin
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+              end
+            endcase
+          end
           local_buffer_B[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(B_data_out[DATA_BITS*4-1:DATA_BITS*3]);
           local_buffer_B[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(B_data_out[DATA_BITS*3-1:DATA_BITS*2]);
-          local_buffer_B[i][DATA_BITS_BLOCK_IN*2-1 :   DATA_BITS_BLOCK_IN] <= $signed(B_data_out[DATA_BITS*2-1:DATA_BITS]);
-          local_buffer_B[i][DATA_BITS_BLOCK_IN-1 : 0] <= $signed(B_data_out[DATA_BITS-1:0]);
+          local_buffer_B[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(B_data_out[DATA_BITS*2-1:DATA_BITS*1]);
+          local_buffer_B[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(B_data_out[DATA_BITS*1-1:DATA_BITS*0]);
         end else begin
           local_buffer_A[i] <= {(DATA_BITS_LB_IN) {1'b0}};
           local_buffer_B[i] <= {(DATA_BITS_LB_IN) {1'b0}};
