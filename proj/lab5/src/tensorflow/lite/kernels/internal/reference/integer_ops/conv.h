@@ -73,21 +73,22 @@ void matrix_multiply2D(int rowsA, int colsA, int rowsB, int colsB) {
         }
     }
 }
-
-void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
+void matrix_multiply2D_acc_block(int baseM, int baseN, int baseK, int blockSize, int32_t input_offset) {
   int K = blockSize;
   int M = blockSize;
   int N = blockSize;
 
   //--------------------------------------------------
-
+  //printf("Reset TPU\n");
   cfu_op0(1, 0, 0);  // reset
   cfu_op0(1, 1, 0);
   //--------------------------------------------------
   cfu_op0(/* funct7= */ 2, /* in0= */ K, /* in1= */ K);  // Set parameter K
   cfu_op0(/* funct7= */ 4, /* in0= */ M, /* in1= */ M);  // Set parameter M
   cfu_op0(/* funct7= */ 6, /* in0= */ N, /* in1= */ N);  // Set parameter N
+  cfu_op0(/* funct7= */ 18, /* in0= */ input_offset, /* in1= */ input_offset);  // Set parameter inputOffset
 
+  //printf("\nMatrix A for global buffer =\n");
   int calignA = int((M + 3) / 4) * 4;
   int16_t addr = 0;
   for (int dr = baseM; dr < baseM + calignA; dr += 4) {
@@ -133,7 +134,7 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
       addr++;
     }
   }
-
+  //printf("\nMatrix B for global buffer =\n");
   int calignB = int((N + 3) / 4) * 4;
   addr = 0;
   for (int cptr = baseN; cptr < baseN + calignB; cptr += 4) {
@@ -173,7 +174,6 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
       in_data4 |= ((int32_t)(b1 & 0xFF) << 16);
       in_data4 |= ((int32_t)(b0 & 0xFF) << 24);
       //printf("%ld\t%ld\t%ld\t%ld\n", b0, b1, b2, b3);
-
       cfu_op0(10, addr, in_data4);  // Set global bufer B
       addr++;
     }
@@ -193,10 +193,10 @@ void matrix_multiply2D_acc(int baseM, int baseN, int baseK, int blockSize) {
   for (int cptr = baseN; cptr < baseN + calignC; cptr += 4) {
     for (int dr = baseM; dr < baseM + M; dr++) {
 
-      matrix_result_temp[dr][cptr + 3] += cfu_op0(14, addr, 0);
-      matrix_result_temp[dr][cptr + 2] += cfu_op0(15, addr, 0);
-      matrix_result_temp[dr][cptr + 1] += cfu_op0(16, addr, 0);
-      matrix_result_temp[dr][cptr + 0] += cfu_op0(17, addr, 0);
+      matrix_result[dr][cptr + 3] += cfu_op0(14, addr, 0);
+      matrix_result[dr][cptr + 2] += cfu_op0(15, addr, 0);
+      matrix_result[dr][cptr + 1] += cfu_op0(16, addr, 0);
+      matrix_result[dr][cptr + 0] += cfu_op0(17, addr, 0);
       addr++;
     }
   }
@@ -474,6 +474,8 @@ unsigned my_start = perf_get_mcycle();
             //printf("i:%d, j:%d, input_val=%ld, intput_val int8_t=%d, offset =%ld\n",fmaps_row,fmaps_col,input_val,input_data[Offset(input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)], input_offset);
 
 	        //matrix_fmaps[fmaps_row * fmaps_size + fmaps_col] = input_val;
+          matrix_fmaps[fmaps_row][fmaps_col] = input_val;
+          /*
           if (input_offset <0) {
 		        matrix_fmaps[fmaps_row][fmaps_col] = input_val;
             matrix_input_offset[fmaps_row][fmaps_col] = input_offset;
@@ -482,6 +484,7 @@ unsigned my_start = perf_get_mcycle();
             matrix_fmaps[fmaps_row][fmaps_col] = input_val + 10 ;
             matrix_input_offset[fmaps_row][fmaps_col] = input_offset -10 ;
           }
+          */
               }
             }
           }
@@ -562,17 +565,17 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
     for (int jj = 0; jj < NN; jj+=blockSize)
       for (int kk = 0; kk < KK; kk+=blockSize) {
         //matrix_multiply2D_acc(matrix_fmaps, matrix_filter, matrix_result_temp, ii, jj, kk, blockSize);
-        matrix_multiply2D_acc(ii, jj, kk, blockSize);
-        matrix_multiply2D_acc_off(ii, jj, kk, blockSize);
+        matrix_multiply2D_acc_block(ii, jj, kk, blockSize, input_offset);
+        //matrix_multiply2D_acc_off(ii, jj, kk, blockSize);
         //matrix_multiply2D_acc(matrix_input_offset, matrix_filter, matrix_input_offset_result, ii, jj, kk, blockSize);
       }
-
+/*
   for (int i = 0; i < MM; i++) {
     for (int j = 0; j < NN; j++) {
       matrix_result[i][j] = matrix_result_temp[i][j] + matrix_input_offset_result[i][j];
     }
   }
-
+*/
 //----------------------------------------------------------------------------------------------------
 
 
@@ -601,14 +604,16 @@ for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
         }
       }
     }
-
+/*
 for(int i=0;i<4;i++){
   for(int j=0;j<4;j++){
     printf("%ld\t",matrix_result[i][j]);
   }
   printf("\n");
 }
-printf("Input offset: %ld\n", matrix_input_offset[0][0]);
+*/
+printf("Input offset: %ld\n", input_offset);
+/*
 printf("check matric A\n");
 for(int i=0;i<M;i++){
   for(int j=0;j<K;j++){
@@ -618,6 +623,7 @@ for(int i=0;i<M;i++){
   }
   //printf("\n");
 }
+
 printf("check matric B\n");
 for(int i=0;i<K;i++){
   for(int j=0;j<N;j++){
@@ -636,6 +642,7 @@ for(int i=0;i<M;i++){
   }
   //printf("\n");
 }
+*/
 /*
 printf("check matric C");
 for(int i=0;i<M;i++){
