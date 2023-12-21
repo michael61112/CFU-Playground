@@ -25,7 +25,7 @@ module TPU_fsm #(
     input       [         31:0] K,
     input       [         31:0] M,
     input       [         31:0] N,
-    input       [DATA_BITS-1:0] inputOffset,
+    input       [31:0] inputOffset,
 
     output busy,
     output sa_rst_n,
@@ -68,6 +68,16 @@ module TPU_fsm #(
   reg busy_temp;
   reg sa_rst_n_temp;
 
+  wire [DATA_BITS_BLOCK_IN-1:0] extended_A0;
+  wire [DATA_BITS_BLOCK_IN-1:0] extended_A1;
+  wire [DATA_BITS_BLOCK_IN-1:0] extended_A2;
+  wire [DATA_BITS_BLOCK_IN-1:0] extended_A3;
+
+  assign extended_A3 = {{DATA_BITS{A_data_out[DATA_BITS*4-1]}}, A_data_out[DATA_BITS*4-1:DATA_BITS*3]};
+  assign extended_A2 = {{DATA_BITS{A_data_out[DATA_BITS*3-1]}}, A_data_out[DATA_BITS*3-1:DATA_BITS*2]};
+  assign extended_A1 = {{DATA_BITS{A_data_out[DATA_BITS*2-1]}}, A_data_out[DATA_BITS*2-1:DATA_BITS*1]};
+  assign extended_A0 = {{DATA_BITS{A_data_out[DATA_BITS*1-1]}}, A_data_out[DATA_BITS*1-1:DATA_BITS*0]};
+
   reg [DATA_BITS_LB_OUT-1:0] result[3:0];
   wire [DATA_BITS_LB_OUT-1:0] result_temp[3:0];
 
@@ -96,6 +106,8 @@ module TPU_fsm #(
   reg [ADDR_BITS-1:0] Moffset_index_o;
   reg [ADDR_BITS-1:0] Noffset_index_o;
 
+
+
   always @(posedge clk) begin
     if (in_valid) begin
       K_reg <= K;
@@ -123,8 +135,8 @@ module TPU_fsm #(
   assign C_index   = C_index_temp;
   assign C_data_in = C_data_in_temp;
 
-  reg signed [DATA_BITS_LB_IN-1:0] local_buffer_A[3:0];
-  reg signed [DATA_BITS_LB_IN-1:0] local_buffer_B[3:0];
+  reg [DATA_BITS_LB_IN-1:0] local_buffer_A[3:0];
+  reg [DATA_BITS_LB_IN-1:0] local_buffer_B[3:0];
 
   assign local_buffer_A0 = local_buffer_A[0];
   assign local_buffer_A1 = local_buffer_A[1];
@@ -253,41 +265,41 @@ module TPU_fsm #(
         if (A_index_temp < K_reg * (Moffset_times + 1)) begin
           // Signed Extension
           if (Moffset_times != check_Moffset_times) begin // For the case M > 4, but not calculate the last M
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
           end else begin
             case (M_reg%4)
-              'd0: begin  // For the M <= 4
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+              'd0: begin  // For the M = 4
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
               end
               'd1: begin
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2]);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1]);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2;
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1;
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0;
               end
               'd2: begin
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1]);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1;
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0;
               end
               'd3: begin
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0]);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0;
               end
               default begin
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= $signed(A_data_out[DATA_BITS*4-1:DATA_BITS*3] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= $signed(A_data_out[DATA_BITS*3-1:DATA_BITS*2] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= $signed(A_data_out[DATA_BITS*2-1:DATA_BITS*1] + inputOffset);
-                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= $signed(A_data_out[DATA_BITS*1-1:DATA_BITS*0] + inputOffset);
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*4-1 : DATA_BITS_BLOCK_IN*3] <= extended_A3 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*3-1 : DATA_BITS_BLOCK_IN*2] <= extended_A2 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*2-1 : DATA_BITS_BLOCK_IN*1] <= extended_A1 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
+                local_buffer_A[i][DATA_BITS_BLOCK_IN*1-1 : DATA_BITS_BLOCK_IN*0] <= extended_A0 + inputOffset[DATA_BITS_BLOCK_IN-1:0];
               end
             endcase
           end

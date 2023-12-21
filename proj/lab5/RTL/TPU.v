@@ -60,7 +60,7 @@ module TPU #(
     output [ADDR_BITS-1:0] C_index,
     output [DATA_BITS_GB_OUT:0] C_data_in,
     input [DATA_BITS_GB_OUT:0] C_data_out,
-    input [DATA_BITS-1:0] inputOffset
+    input [31:0] inputOffset
 );
 
   assign local_buffer_A0_o = local_buffer_A0;

@@ -115,7 +115,7 @@ module Cfu #(
   reg A_wr_en_init;
   reg B_wr_en_init;
   reg C_wr_en_init;
-  reg [DATA_BITS-1:0] inputOffset;
+  reg [31:0] inputOffset;
 
   wire A_wr_en, B_wr_en, C_wr_en;
   wire [ADDR_BITS-1:0] A_index, B_index, C_index;
@@ -292,7 +292,7 @@ module Cfu #(
             C_index_init <= cmd_payload_inputs_0[ADDR_BITS-1:0];
           end
           7'd18: begin  // Set InputOffset
-            inputOffset <= cmd_payload_inputs_0[DATA_BITS-1:0];
+            inputOffset <= cmd_payload_inputs_0[31:0];
           end
         endcase
       end
