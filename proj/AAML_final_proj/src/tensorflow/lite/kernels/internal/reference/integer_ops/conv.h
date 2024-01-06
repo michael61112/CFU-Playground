@@ -19,8 +19,13 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
-#include "perf.h"
+#include "playground_util/print_params.h"
+
 #include "cfu.h"
+#include "perf.h"
+#include "models/my_cycles.h"
+extern long long unsigned my_cycles;
+
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -33,6 +38,19 @@ inline void ConvPerChannel(
     const int8_t* filter_data, const RuntimeShape& bias_shape,
     const int32_t* bias_data, const RuntimeShape& output_shape,
     int8_t* output_data) {
+  //printf("\n");
+  //print_conv_params(params, input_shape, filter_shape, output_shape);
+#ifdef USE_LITERAL_VALUE
+  // Get parameters.
+  const int32_t input_offset = params.input_offset;  // r = s(q - Z)
+  const int stride_width = 1;//params.stride_width;
+  const int stride_height = 1;//params.stride_height;
+  const int dilation_width_factor = 1;//params.dilation_width_factor;
+  const int dilation_height_factor = params.dilation_height_factor;
+  const int pad_width = 0;//params.padding_values.width;
+  const int pad_height = 0;//params.padding_values.height;
+  const int32_t output_offset = -128;//params.output_offset;
+#else
   // Get parameters.
   const int32_t input_offset = params.input_offset;  // r = s(q - Z)
   const int stride_width = params.stride_width;
@@ -42,7 +60,17 @@ inline void ConvPerChannel(
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
   const int32_t output_offset = params.output_offset;
-
+  /*
+  printf("input_offset: %ld\n",input_offset);
+  printf("stride_width: %d\n",stride_width);
+  printf("stride_height: %d\n",stride_height);
+  printf("dilation_width_factor: %d\n",dilation_width_factor);
+  printf("dilation_height_factor: %d\n",dilation_height_factor);
+  printf("pad_width: %d\n",pad_width);
+  printf("pad_height: %d\n",pad_height);
+  printf("output_offset: %ld\n",output_offset);
+  */
+#endif
   // Set min and max value of the output.
   const int32_t output_activation_min = params.quantized_activation_min;
   const int32_t output_activation_max = params.quantized_activation_max;
@@ -75,14 +103,13 @@ inline void ConvPerChannel(
       const int in_y_origin = (out_y * stride_height) - pad_height;
       for (int out_x = 0; out_x < output_width; ++out_x) {
         const int in_x_origin = (out_x * stride_width) - pad_width;
-        for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+	      for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           auto group = out_channel / filters_per_group;
-          (void)group;
-          // Config input_offset and reset CFU accumulator
-          cfu_op0(/* funct7= */ 1, input_offset, 0);
-          // Reset Software accumulator
-          int32_t acc_cfu = 0;
-          int32_t acc = 0;
+#ifdef USE_SIMD
+	        int32_t acc = cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
+#else
+	        int32_t acc = 0;
+#endif
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
@@ -96,44 +123,98 @@ inline void ConvPerChannel(
               if (!is_point_inside_image) {
                 continue;
               }
-              int in_channel;
-              // unrolling factor: 4
-              for (in_channel = 0; in_channel+4 < input_depth; in_channel += 4) {
-                uint32_t input_val = *((uint32_t *)(input_data + Offset(
-                    input_shape, batch, in_y, in_x, in_channel)));
+#ifdef Use_Perf_Counter
+              unsigned my_start = perf_get_mcycle();
+              perf_enable_counter(0);
+#endif              
+#ifdef USE_ORIGIN_MODE              
+          for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+            int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                        in_channel + group * filter_input_depth)];
+            int32_t filter_val = filter_data[Offset(
+                      filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
-                uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
-                    filter_shape, out_channel, filter_y, filter_x, in_channel)));
-                acc_cfu = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
-              }
-              // left-over
-              for (; in_channel < input_depth; in_channel++) {
-                int8_t input_val = *((int8_t *)(input_data + Offset(
-                    input_shape, batch, in_y, in_x, in_channel)));
+            acc += filter_val * (input_val + input_offset);
+          }
+#elif USE_UNROLLING
+          if (filter_input_depth < 4) {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                        in_channel + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                        filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
-                int8_t filter_val = *((int8_t *)(filter_data + Offset(
-                    filter_shape, out_channel, filter_y, filter_x, in_channel)));
-                // Accumulate with 32 bits accumulator.
-                // In the nudging process during model quantization, we force
-                // real value of 0.0 be represented by a quantized value. This
-                // guarantees that the input_offset is a int8_t, even though
-                // it is represented using int32_t. int32_t += int8_t *
-                // (int8_t - int8_t) so the highest value we can get from each
-                // accumulation is [-127, 127] * ([-128, 127] -
-                // [-128, 127]), which is [-32512, 32512]. log2(32512)
-                // = 14.98, which means we can accumulate at least 2^16
-                // multiplications without overflow. The accumulator is
-                // applied to a filter so the accumulation logic will hold as
-                // long as the filter size (filter_y * filter_x * in_channel)
-                // does not exceed 2^16, which is the case in all the models
-                // we have seen so far.
-                // TODO(b/174275578): Add a check to make sure the
-                // accumulator depth is smaller than 2^16.
-                acc += filter_val * (input_val + input_offset);
-              }
+              acc += filter_val * (input_val + input_offset);
             }
           }
-          acc += acc_cfu;
+          else {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+  //--------------------------------------------------------------------------------------------
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 0) + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                          filter_shape, out_channel, filter_y, filter_x, (in_channel + 0))];
+
+              acc += filter_val * (input_val + input_offset);
+
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 1) + group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, (in_channel + 1))];
+
+              acc += filter_val * (input_val + input_offset);
+
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 2) + group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel + 2)];
+
+              acc += filter_val * (input_val + input_offset);
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 3)+ group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel + 3)];
+
+              acc += filter_val * (input_val + input_offset);
+            }
+          }
+#elif USE_SIMD
+          if (filter_input_depth < 4) {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                  in_channel + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel)];
+
+              acc += filter_val * (input_val + input_offset);
+            }
+          }
+          else {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+              uint32_t input_val = *((uint32_t *)(input_data + Offset(
+                            input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
+
+                        uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
+                            filter_shape, out_channel, filter_y, filter_x, in_channel)));
+              acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
+              //printf("acc: %ld\n\n", acc);
+            }
+          }
+#endif
+#ifdef Use_Perf_Counter
+              perf_enable_counter(0);
+              unsigned my_finish = perf_get_mcycle();
+              my_cycles += (my_finish - my_start);
+#endif
+            }
+          }
+
+//-------------------------------------------------------------------------------------
+
+
           if (bias_data) {
             acc += bias_data[out_channel];
           }
@@ -175,6 +256,7 @@ inline void ConvPerChannel(
     const int8_t* filter_data, const RuntimeShape& bias_shape,
     const AccumScalar* bias_data, const RuntimeShape& output_shape,
     int16_t* output_data) {
+  //print_conv_params(params, input_shape, filter_shape, output_shape);
   // Get parameters.
   const int stride_width = params.stride_width;
   const int stride_height = params.stride_height;

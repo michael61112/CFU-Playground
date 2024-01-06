@@ -1,3 +1,18 @@
+// Copyright 2021 The CFU-Playground Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
 module Cfu (
   input               cmd_valid,
   output              cmd_ready,
@@ -10,17 +25,17 @@ module Cfu (
   input               reset,
   input               clk
 );
-  reg [15:0] InputOffset;
+  localparam InputOffset = $signed(9'd128);
 
   // SIMD multiply step:
-  wire signed [16:0] prod_0, prod_1, prod_2, prod_3;
-  assign prod_0 =  ($signed(cmd_payload_inputs_0[7 : 0]) + $signed(InputOffset))
+  wire signed [15:0] prod_0, prod_1, prod_2, prod_3;
+  assign prod_0 =  ($signed(cmd_payload_inputs_0[7 : 0]) + InputOffset)
                   * $signed(cmd_payload_inputs_1[7 : 0]);
-  assign prod_1 =  ($signed(cmd_payload_inputs_0[15: 8]) + $signed(InputOffset))
+  assign prod_1 =  ($signed(cmd_payload_inputs_0[15: 8]) + InputOffset)
                   * $signed(cmd_payload_inputs_1[15: 8]);
-  assign prod_2 =  ($signed(cmd_payload_inputs_0[23:16]) + $signed(InputOffset))
+  assign prod_2 =  ($signed(cmd_payload_inputs_0[23:16]) + InputOffset)
                   * $signed(cmd_payload_inputs_1[23:16]);
-  assign prod_3 =  ($signed(cmd_payload_inputs_0[31:24]) + $signed(InputOffset))
+  assign prod_3 =  ($signed(cmd_payload_inputs_0[31:24]) + InputOffset)
                   * $signed(cmd_payload_inputs_1[31:24]);
 
   wire signed [31:0] sum_prods;
@@ -33,27 +48,15 @@ module Cfu (
     if (reset) begin
       rsp_payload_outputs_0 <= 32'b0;
       rsp_valid <= 1'b0;
-      InputOffset <= 0;
     end else if (rsp_valid) begin
       // Waiting to hand off response to CPU.
       rsp_valid <= ~rsp_ready;
     end else if (cmd_valid) begin
       rsp_valid <= 1'b1;
       // Accumulate step:
-      case (cmd_payload_function_id[9:3])
-        2'b000_0000: begin
-          InputOffset <= InputOffset;
-          rsp_payload_outputs_0 <= rsp_payload_outputs_0 + sum_prods;
-        end
-        2'b000_0001: begin
-          InputOffset <= cmd_payload_inputs_0[15:0];
-          rsp_payload_outputs_0 <= 0'b0;
-        end
-        default: begin
-          InputOffset <= InputOffset;
-          rsp_payload_outputs_0 <= 0'b0;
-        end
-      endcase
+      rsp_payload_outputs_0 <= |cmd_payload_function_id[9:3]
+          ? 32'b0
+          :rsp_payload_outputs_0 + sum_prods;
     end
   end
 endmodule

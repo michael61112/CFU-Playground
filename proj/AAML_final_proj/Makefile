@@ -46,5 +46,5 @@ DEFINES += INCLUDE_MODEL_MLCOMMONS_TINY_V01_IMGC
 
 # Uncomment this line to include the ASCII animated donut demo.
 # DEFINES += DONUT_DEMO
-
+DEFINES += USE_SIMD
 include ../proj.mk
