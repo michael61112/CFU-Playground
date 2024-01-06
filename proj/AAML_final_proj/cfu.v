@@ -36,7 +36,7 @@ module Cfu (
                   * $signed(b7);
 
   wire signed [31:0] sum_prods;
-  assign sum_prods = prod_0 + prod_1 + prod_2 + prod_3; // + prod_4 + prod_5 + prod_6 + prod_7;
+  assign sum_prods = prod_0 + prod_1 + prod_2 + prod_3 + prod_4 + prod_5 + prod_6 + prod_7;
 
   // Only not ready for a command when we have a response.
   assign cmd_ready = ~rsp_valid;
