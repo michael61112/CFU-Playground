@@ -209,9 +209,11 @@ inline void ConvPerChannel(
               uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
                             filter_shape, out_channel, filter_y, filter_x, in_channel)));
               */
-              cfu_op0(/* funct7= */ 2, /* in0= */ input_val, /* in1= */ filter_val);
-              cfu_op0(/* funct7= */ 3, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
-              acc = cfu_op0(4,0,0);
+             cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
+             acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
+              //cfu_op0(/* funct7= */ 2, /* in0= */ input_val, /* in1= */ filter_val);
+              //cfu_op0(/* funct7= */ 3, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
+              //acc = cfu_op0(4,0,0);
               //printf("input_val: %lld\n\n", input_val);
             }
           }
