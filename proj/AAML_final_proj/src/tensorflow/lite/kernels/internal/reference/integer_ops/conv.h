@@ -106,7 +106,8 @@ inline void ConvPerChannel(
 	      for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           auto group = out_channel / filters_per_group;
 #ifdef USE_SIMD
-	        int32_t acc = cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
+	        //int32_t acc = cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
+          int32_t acc = cfu_op0(/* funct7= */ 1, input_offset, 0); // resets acc
 #else
 	        int32_t acc = 0;
 #endif
@@ -197,7 +198,7 @@ inline void ConvPerChannel(
               uint32_t input_val = *((uint32_t *)(input_data + Offset(
                             input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
 
-                        uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
+              uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
                             filter_shape, out_channel, filter_y, filter_x, in_channel)));
               acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
               //printf("acc: %ld\n\n", acc);
