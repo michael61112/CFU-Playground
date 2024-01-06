@@ -194,24 +194,24 @@ inline void ConvPerChannel(
             }
           }
           else {
-            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 8) {
-            //for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
-              
+            //for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 8) {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+              /*
               uint64_t input_val = *((uint64_t *)(input_data + Offset(
                             input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
 
               uint64_t filter_val = *((uint64_t *)(filter_data + Offset(
                             filter_shape, out_channel, filter_y, filter_x, in_channel)));
-              /*
+              */
               uint32_t input_val = *((uint32_t *)(input_data + Offset(
                             input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
 
               uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
                             filter_shape, out_channel, filter_y, filter_x, in_channel)));
-              */
               cfu_op0(/* funct7= */ 2, /* in0= */ input_val, /* in1= */ filter_val);
-              cfu_op0(/* funct7= */ 3, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
               acc = cfu_op0(4,0,0);
+              //cfu_op0(/* funct7= */ 2, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
+              //acc = cfu_op0(3,0,0);
               //printf("input_val: %lld\n\n", input_val);
             }
           }
