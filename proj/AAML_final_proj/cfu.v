@@ -26,22 +26,6 @@ module Cfu (
   wire signed [31:0] sum_prods;
   assign sum_prods = prod_0 + prod_1 + prod_2 + prod_3;
 
-// ------------------------------------------------------------------------------
-    wire signed [31:0] value;
-    reg signed [31:0] minValue;
-    reg signed [31:0] maxValue;
-    reg signed [31:0] clampedValue;
-    assign value = cmd_payload_inputs_0;
-
-    always @* begin
-        if (value <= minValue)
-            clampedValue = minValue;
-        else if (value >= maxValue)
-            clampedValue = maxValue;
-        else
-            clampedValue = value;
-    end
-
   // Only not ready for a command when we have a response.
   assign cmd_ready = ~rsp_valid;
 
@@ -64,13 +48,6 @@ module Cfu (
         2'b000_0001: begin
           InputOffset <= cmd_payload_inputs_0[15:0];
           rsp_payload_outputs_0 <= 0'b0;
-        end
-        7'd6: begin
-          minValue = cmd_payload_inputs_0;
-          maxValue = cmd_payload_inputs_1;
-        end
-        7'd7: begin
-          rsp_payload_outputs_0 <= clampedValue;
         end
         default: begin
           InputOffset <= InputOffset;
