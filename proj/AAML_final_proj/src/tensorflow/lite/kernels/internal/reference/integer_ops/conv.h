@@ -32,6 +32,10 @@ typedef struct {
   uint32_t high;
 } my_uint64_t;
 
+typedef struct {
+  my_uint64_t Low;
+  my_uint64_t High;
+} my_uint128_t;
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -132,15 +136,17 @@ inline void ConvPerChannel(
               }
               int in_channel;
               // unrolling factor: 4
-              for (in_channel = 0; in_channel+4 < input_depth; in_channel += 8) {
-                  my_uint64_t input_val = *((my_uint64_t *)(input_data + Offset(
+              for (in_channel = 0; in_channel+4 < input_depth; in_channel += 16) {
+                  my_uint128_t input_val = *((my_uint128_t *)(input_data + Offset(
                                 input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
 
-                  my_uint64_t filter_val = *((my_uint64_t *)(filter_data + Offset(
+                  my_uint128_t filter_val = *((my_uint128_t *)(filter_data + Offset(
                                 filter_shape, out_channel, filter_y, filter_x, in_channel)));
 
-                cfu_op0(/* funct7= */ 0, /* in0= */ input_val.low, /* in1= */ filter_val.low);
-                acc_cfu = cfu_op0(/* funct7= */ 0, /* in0= */ input_val.high, /* in1= */ filter_val.high);
+                cfu_op0(/* funct7= */ 0, /* in0= */ input_val.Low.low, /* in1= */ filter_val.Low.low);
+                cfu_op0(/* funct7= */ 0, /* in0= */ input_val.Low.high, /* in1= */ filter_val.Low.high);
+                cfu_op0(/* funct7= */ 0, /* in0= */ input_val.High.low, /* in1= */ filter_val.High.low);
+                acc_cfu = cfu_op0(/* funct7= */ 0, /* in0= */ input_val.High.high, /* in1= */ filter_val.High.high);
               }
               // left-over
               for (; in_channel < input_depth; in_channel++) {
