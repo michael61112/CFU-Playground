@@ -41,6 +41,22 @@ module Cfu (
         else
             clampedValue = value;
     end
+//-------------------------------------------------------------------------------
+  reg [15:0] filter_offset, input_offset;
+
+  // SIMD multiply step:
+  wire signed [16:0] prod_fc_0, prod_fc_1, prod_fc_2, prod_fc_3;
+  assign prod_fc_0 =  ($signed(cmd_payload_inputs_0[7 : 0]) + $signed(filter_offset))
+                    * ($signed(cmd_payload_inputs_1[7 : 0]) + $signed(input_offset));
+  assign prod_fc_1 =  ($signed(cmd_payload_inputs_0[15: 8]) + $signed(filter_offset))
+                    * ($signed(cmd_payload_inputs_1[15: 8]) + $signed(input_offset));
+  assign prod_fc_2 =  ($signed(cmd_payload_inputs_0[23:16]) + $signed(filter_offset))
+                    * ($signed(cmd_payload_inputs_1[23:16]) + $signed(input_offset));
+  assign prod_fc_3 =  ($signed(cmd_payload_inputs_0[31:24]) + $signed(filter_offset))
+                    * ($signed(cmd_payload_inputs_1[31:24]) + $signed(input_offset));
+
+  wire signed [31:0] sum_prods_fc;
+  assign sum_prods_fc = prod_fc_0 + prod_fc_1 + prod_fc_2 + prod_fc_3;
 
   // Only not ready for a command when we have a response.
   assign cmd_ready = ~rsp_valid;
@@ -65,6 +81,16 @@ module Cfu (
           InputOffset <= cmd_payload_inputs_0[15:0];
           rsp_payload_outputs_0 <= 0'b0;
         end
+        7'd3: begin
+          filter_offset <= cmd_payload_inputs_0;
+          input_offset <= cmd_payload_inputs_1;
+          rsp_payload_outputs_0 <= 0'b0;
+        end
+        7'd4: begin
+          filter_offset <= filter_offset;
+          input_offset <= input_offset;
+          rsp_payload_outputs_0 <= rsp_payload_outputs_0 + sum_prods_fc;
+        end
         7'd6: begin
           minValue = cmd_payload_inputs_0;
           maxValue = cmd_payload_inputs_1;
@@ -75,6 +101,8 @@ module Cfu (
         default: begin
           InputOffset <= InputOffset;
           rsp_payload_outputs_0 <= 0'b0;
+          rsp_payload_outputs_0 <= rsp_payload_outputs_0 <= 0'b0 + sum_prods_fc;
+
         end
       endcase
     end

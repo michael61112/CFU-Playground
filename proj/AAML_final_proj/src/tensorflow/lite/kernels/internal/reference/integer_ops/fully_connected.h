@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
+#include "cfu.h"
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -53,10 +54,11 @@ inline void FullyConnectedPerChannel(
   for (int b = 0; b < batches; ++b) {
     for (int out_c = 0; out_c < output_depth; ++out_c) {
       int32_t acc = 0;
-      for (int d = 0; d < accum_depth; ++d) {
-        int32_t input_val = input_data[b * accum_depth + d];
-        int32_t filter_val = filter_data[out_c * accum_depth + d];
-        acc += filter_val * (input_val + input_offset);
+      cfu_op0(3, 0, input_offset);
+      for (int d = 0; d < accum_depth; d+=4) {
+        uint32_t input_val = *((uint32_t *)(input_data + (b * accum_depth + d)));
+        uint32_t filter_val = *((uint32_t *)(filter_data + (out_c * accum_depth + d)));
+        acc = cfu_op0(4, filter_val, input_val);
       }
       if (bias_data) {
         acc += bias_data[out_c];
@@ -137,10 +139,11 @@ inline void FullyConnected(
   for (int b = 0; b < batches; ++b) {
     for (int out_c = 0; out_c < output_depth; ++out_c) {
       int32_t acc = 0;
-      for (int d = 0; d < accum_depth; ++d) {
-        int32_t input_val = input_data[b * accum_depth + d];
-        int32_t filter_val = filter_data[out_c * accum_depth + d];
-        acc += (filter_val + filter_offset) * (input_val + input_offset);
+      cfu_op0(3, filter_offset, input_offset);
+      for (int d = 0; d < accum_depth; d+=4) {
+        uint32_t input_val = *((uint32_t *)(input_data + (b * accum_depth + d)));
+        uint32_t filter_val = *((uint32_t *)(filter_data + (out_c * accum_depth + d)));
+        acc = cfu_op0(4, filter_val, input_val);
       }
       if (bias_data) {
         acc += bias_data[out_c];
