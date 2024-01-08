@@ -24,7 +24,13 @@ limitations under the License.
 #include "cfu.h"
 #include "perf.h"
 #include "models/my_cycles.h"
+#include <stdint.h>
 extern long long unsigned my_cycles;
+
+typedef struct {
+  uint32_t low;
+  uint32_t high;
+} my_uint64_t;
 
 
 namespace tflite {
@@ -127,14 +133,14 @@ inline void ConvPerChannel(
               int in_channel;
               // unrolling factor: 4
               for (in_channel = 0; in_channel+4 < input_depth; in_channel += 8) {
-                  uint64_t input_val = *((uint64_t *)(input_data + Offset(
+                  my_uint64_t input_val = *((my_uint64_t *)(input_data + Offset(
                                 input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
 
-                  uint64_t filter_val = *((uint64_t *)(filter_data + Offset(
+                  my_uint64_t filter_val = *((my_uint64_t *)(filter_data + Offset(
                                 filter_shape, out_channel, filter_y, filter_x, in_channel)));
 
-                cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
-                acc_cfu = cfu_op0(/* funct7= */ 0, /* in0= */ input_val >> 32, /* in1= */ filter_val >> 32);
+                cfu_op0(/* funct7= */ 0, /* in0= */ input_val.low, /* in1= */ filter_val.low);
+                acc_cfu = cfu_op0(/* funct7= */ 0, /* in0= */ input_val.high, /* in1= */ filter_val.high);
               }
               // left-over
               for (; in_channel < input_depth; in_channel++) {
