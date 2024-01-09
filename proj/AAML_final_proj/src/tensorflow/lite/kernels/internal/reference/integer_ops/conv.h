@@ -108,59 +108,43 @@ inline void ConvPerChannel(
 
           int32_t acc = cfu_op0(/* funct7= */ 1, input_offset, 0); // resets acc
 
-          if (filter_input_depth < 4) {
-            for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-              const int in_y = in_y_origin + dilation_height_factor * filter_y;
-              for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-                const int in_x = in_x_origin + dilation_width_factor * filter_x;
+          for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
+            const int in_y = in_y_origin + dilation_height_factor * filter_y;
+            for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
+              const int in_x = in_x_origin + dilation_width_factor * filter_x;
 
-                // Zero padding by omitting the areas outside the image.
-                const bool is_point_inside_image =
-                    (in_x >= 0) && (in_x < input_width) && (in_y >= 0) &&
-                    (in_y < input_height);
+              // Zero padding by omitting the areas outside the image.
+              const bool is_point_inside_image =
+                  (in_x >= 0) && (in_x < input_width) && (in_y >= 0) &&
+                  (in_y < input_height);
 
-                if (!is_point_inside_image) {
-                  continue;
-                }
+              if (!is_point_inside_image) {
+                continue;
+              }
 
-              
-                for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
-                  int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
-                                      in_channel + group * filter_input_depth)];
-                  int32_t filter_val = filter_data[Offset(
-                      filter_shape, out_channel, filter_y, filter_x, in_channel)];
+            if (filter_input_depth < 4) {
+              for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+                int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    in_channel + group * filter_input_depth)];
+                int32_t filter_val = filter_data[Offset(
+                    filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
-                  acc += filter_val * (input_val + input_offset);
-                }
+                acc += filter_val * (input_val + input_offset);
+              }
+            }
+            else {
+              for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+                uint32_t input_val = *((uint32_t *)(input_data + Offset(
+                              input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
+
+                uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
+                              filter_shape, out_channel, filter_y, filter_x, in_channel)));
+                acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
+                //printf("acc: %ld\n\n", acc);
               }
             }
           }
-          else {
-            for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-              const int in_y = in_y_origin + dilation_height_factor * filter_y;
-              for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-                const int in_x = in_x_origin + dilation_width_factor * filter_x;
-
-                // Zero padding by omitting the areas outside the image.
-                const bool is_point_inside_image =
-                    (in_x >= 0) && (in_x < input_width) && (in_y >= 0) &&
-                    (in_y < input_height);
-
-                if (!is_point_inside_image) {
-                  continue;
-                }
-
-                for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
-                  uint32_t input_val = *((uint32_t *)(input_data + Offset(
-                                input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
-
-                  uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
-                                filter_shape, out_channel, filter_y, filter_x, in_channel)));
-                  acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
-                }
-              }
-            }
-          }
+        }
 
 //-------------------------------------------------------------------------------------
 
