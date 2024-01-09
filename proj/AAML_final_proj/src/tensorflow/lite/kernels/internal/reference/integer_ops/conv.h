@@ -105,9 +105,12 @@ inline void ConvPerChannel(
         const int in_x_origin = (out_x * stride_width) - pad_width;
 	      for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           auto group = out_channel / filters_per_group;
-
+#ifdef USE_SIMD
+	        //int32_t acc = cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
           int32_t acc = cfu_op0(/* funct7= */ 1, input_offset, 0); // resets acc
-
+#else
+	        int32_t acc = 0;
+#endif
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
@@ -121,30 +124,94 @@ inline void ConvPerChannel(
               if (!is_point_inside_image) {
                 continue;
               }
+#ifdef Use_Perf_Counter
+              unsigned my_start = perf_get_mcycle();
+              perf_enable_counter(0);
+#endif              
+#ifdef USE_ORIGIN_MODE              
+          for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+            int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                        in_channel + group * filter_input_depth)];
+            int32_t filter_val = filter_data[Offset(
+                      filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
-            if (filter_input_depth < 4) {
-              for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
-                int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
-                                    in_channel + group * filter_input_depth)];
-                int32_t filter_val = filter_data[Offset(
-                    filter_shape, out_channel, filter_y, filter_x, in_channel)];
+            acc += filter_val * (input_val + input_offset);
+          }
+#elif USE_UNROLLING
+          if (filter_input_depth < 4) {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                        in_channel + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                        filter_shape, out_channel, filter_y, filter_x, in_channel)];
 
-                acc += filter_val * (input_val + input_offset);
-              }
-            }
-            else {
-              for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
-                uint32_t input_val = *((uint32_t *)(input_data + Offset(
-                              input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
-
-                uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
-                              filter_shape, out_channel, filter_y, filter_x, in_channel)));
-                acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
-                //printf("acc: %ld\n\n", acc);
-              }
+              acc += filter_val * (input_val + input_offset);
             }
           }
-        }
+          else {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+  //--------------------------------------------------------------------------------------------
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 0) + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                          filter_shape, out_channel, filter_y, filter_x, (in_channel + 0))];
+
+              acc += filter_val * (input_val + input_offset);
+
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 1) + group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, (in_channel + 1))];
+
+              acc += filter_val * (input_val + input_offset);
+
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 2) + group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel + 2)];
+
+              acc += filter_val * (input_val + input_offset);
+  //--------------------------------------------------------------------------------------------
+              input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                    (in_channel + 3)+ group * filter_input_depth)];
+              filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel + 3)];
+
+              acc += filter_val * (input_val + input_offset);
+            }
+          }
+#elif USE_SIMD
+          if (filter_input_depth < 4) {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel++) {
+              int32_t input_val = input_data[Offset(input_shape, batch, in_y, in_x,
+                                  in_channel + group * filter_input_depth)];
+              int32_t filter_val = filter_data[Offset(
+                  filter_shape, out_channel, filter_y, filter_x, in_channel)];
+
+              acc += filter_val * (input_val + input_offset);
+            }
+          }
+          else {
+            for (int in_channel = 0; in_channel < filter_input_depth; in_channel += 4) {
+              uint32_t input_val = *((uint32_t *)(input_data + Offset(
+                            input_shape, batch, in_y, in_x, in_channel + group * filter_input_depth)));
+
+              uint32_t filter_val = *((uint32_t *)(filter_data + Offset(
+                            filter_shape, out_channel, filter_y, filter_x, in_channel)));
+              acc = cfu_op0(/* funct7= */ 0, /* in0= */ input_val, /* in1= */ filter_val);
+              //printf("acc: %ld\n\n", acc);
+            }
+          }
+#endif
+#ifdef Use_Perf_Counter
+              perf_enable_counter(0);
+              unsigned my_finish = perf_get_mcycle();
+              my_cycles += (my_finish - my_start);
+#endif
+            }
+          }
 
 //-------------------------------------------------------------------------------------
 
